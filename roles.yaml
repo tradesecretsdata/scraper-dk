@@ -1,0 +1,183 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  IAM roles for single‑bucket serverless data‑pipeline
+  (stage & prod prefixes, GitHub Actions OIDC deploy)
+
+Parameters:
+  Repo:                # GitHub repo in owner/name form, e.g. octo/my‑pipeline
+    Type: String
+  BucketName:          # Shared data bucket, e.g. my-data-bucket
+    Type: String
+  S3Prefix:            # Path after bucket name
+    Type: String
+
+# ────────────────────────────────────────────────────────────────────────────
+#  λ Runtime roles (used by the Lambdas)
+# ────────────────────────────────────────────────────────────────────────────
+Resources:
+  LambdaStageRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: lambda-stage
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: stage-s3
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # object‑level access
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject, s3:DeleteObject]
+                Resource: !Sub arn:aws:s3:::${BucketName}/${S3Prefix}/stage/*
+              # list only the stage prefix
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !Sub arn:aws:s3:::${BucketName}
+                Condition:
+                  StringLike:
+                    s3:prefix: "${S3Prefix}/stage/*"
+              # CloudWatch Logs
+              - Effect: Allow
+                Action: logs:*
+                Resource: arn:aws:logs:*:*:*
+  LambdaProdRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: lambda-prod
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: prod-s3
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject, s3:DeleteObject]
+                Resource: !Sub arn:aws:s3:::${BucketName}/${S3Prefix}/prod/*
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !Sub arn:aws:s3:::${BucketName}
+                Condition:
+                  StringLike:
+                    s3:prefix: "${S3Prefix}/prod/*"
+              - Effect: Allow
+                Action: logs:*
+                Resource: arn:aws:logs:*:*:*
+
+# ────────────────────────────────────────────────────────────────────────────
+#  GitHub Actions → AWS deploy roles (OIDC, one per env)
+# ────────────────────────────────────────────────────────────────────────────
+  GitHubStageDeploy:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: GitHubStageDeploy
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringLike:
+                "token.actions.githubusercontent.com:sub": !Sub "repo:${Repo}:ref:refs/heads/main"
+              StringEquals:
+                "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+      Policies:
+        - PolicyName: stage-deploy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # infra CRUD (CloudFormation, Lambda, etc.)
+              - Effect: Allow
+                Action:
+                  - cloudformation:*
+                  - lambda:*
+                  - events:*
+                  - apigateway:*
+                  - logs:DescribeLogGroups
+                Resource: "*"
+              # write artefacts to stage prefix only
+              - Effect: Allow
+                Action: [s3:PutObject, s3:GetObject, s3:DeleteObject]
+                Resource: !Sub arn:aws:s3:::${BucketName}/${S3Prefix}/stage/*
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !Sub arn:aws:s3:::${BucketName}
+                Condition:
+                  StringLike:
+                    s3:prefix: "${S3Prefix}/stage/*"
+              # hand LambdaStageRole to CloudFormation
+              - Effect: Allow
+                Action: iam:PassRole
+                Resource: !GetAtt LambdaStageRole.Arn
+
+  GitHubProdDeploy:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: GitHubProdDeploy
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringLike:
+                "token.actions.githubusercontent.com:sub": !Sub "repo:${Repo}:ref:refs/heads/main"
+              StringEquals:
+                "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+      Policies:
+        - PolicyName: prod-deploy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudformation:*
+                  - lambda:*
+                  - events:*
+                  - apigateway:*
+                  - logs:DescribeLogGroups
+                Resource: "*"
+              - Effect: Allow
+                Action: [s3:PutObject, s3:GetObject, s3:DeleteObject]
+                Resource: !Sub arn:aws:s3:::${BucketName}/${S3Prefix}/prod/*
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !Sub arn:aws:s3:::${BucketName}
+                Condition:
+                  StringLike:
+                    s3:prefix: "${S3Prefix}/prod/*"
+              - Effect: Allow
+                Action: iam:PassRole
+                Resource: !GetAtt LambdaProdRole.Arn
+
+# ────────────────────────────────────────────────────────────────────────────
+#  Convenient exports
+# ────────────────────────────────────────────────────────────────────────────
+Outputs:
+  LambdaStageRoleArn:
+    Description: Lambda execution role for stage
+    Value: !GetAtt LambdaStageRole.Arn
+  LambdaProdRoleArn:
+    Description: Lambda execution role for prod
+    Value: !GetAtt LambdaProdRole.Arn
+  GitHubStageDeployRoleArn:
+    Description: OIDC deploy role (stage)
+    Value: !GetAtt GitHubStageDeploy.Arn
+  GitHubProdDeployRoleArn:
+    Description: OIDC deploy role (prod)
+    Value: !GetAtt GitHubProdDeploy.Arn
