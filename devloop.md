@@ -1,0 +1,10 @@
+- Create dev branch
+- Make changes
+- SAM build
+- Run tests
+- ??? Other tests? make sure logic works?
+- Push dev
+- Merge dev to main
+- Push main
+- Github actions deploys staging
+- ??? Automatic deploy to prod if staging passes
