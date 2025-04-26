@@ -1,2 +1,4 @@
+- Make sure sam build working with container
+- Try github action again
 - Add tests that run before deploying to stage
 - Use local env variables in scripts/ instead of hardcoding

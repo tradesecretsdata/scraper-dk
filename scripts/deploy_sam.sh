@@ -1,4 +1,4 @@
-sam build
+sam build --use-container
 sam deploy --stack-name pipeline-stage \
   --parameter-overrides Env=stage BucketName=tradesecretsdata S3Prefix=scraper-dk RoleArn=arn:aws:iam::688035104276:role/lambda-stage \
   --config-env stage --guided
