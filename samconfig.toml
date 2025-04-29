@@ -1,4 +1,10 @@
 version = 0.1
+
+# Shared build flags
+[default.build.parameters]
+use_container = true
+
+# Stage
 [stage.deploy.parameters]
 stack_name = "pipeline-stage"
 resolve_s3 = true
@@ -9,3 +15,16 @@ capabilities = "CAPABILITY_IAM"
 disable_rollback = true
 parameter_overrides = "Env=\"stage\" BucketName=\"tradesecretsdata\" S3Prefix=\"scraper-dk\" RoleArn=\"arn:aws:iam::688035104276:role/lambda-stage\" ApiUrl=\"\""
 image_repositories = []
+
+# Prod (CI/CD uses this)
+[prod.deploy.parameters]
+stack_name = "pipeline-prod"
+resolve_s3 = true
+s3_prefix = "pipeline-prod"
+region = "us-east-2"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+disable_rollback = true
+parameter_overrides = "Env=\"prod\" BucketName=\"tradesecretsdata\" S3Prefix=\"scraper-dk\" RoleArn=\"arn:aws:iam::688035104276:role/lambda-prod\" ApiUrl=\"\""
+image_repositories = []
+
