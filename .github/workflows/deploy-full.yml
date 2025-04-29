@@ -1,0 +1,139 @@
+name: CI / CD  (stage ➜ prod)
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION: us-east-1
+  S3_ARTIFACT_BUCKET: my-sam-artifacts # bucket SAM uses for code zips
+  S3_ARTIFACT_PREFIX: sam
+  STACK_STAGE: pipeline-stage
+  STACK_PROD: pipeline-prod
+
+jobs:
+  # ───────────────────────────────────────────────────────────────────────
+  # 1)  Lint + unit tests
+  # ───────────────────────────────────────────────────────────────────────
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+
+      - name: Install deps (runtime + dev)
+        run: |
+          pip install -r requirements-dev.txt
+
+      - name: Lint & unit tests
+        run: |
+          black --check src tests
+          pytest -q
+
+  # ───────────────────────────────────────────────────────────────────────
+  # 2)  Build SAM (once) and publish artefact
+  # ───────────────────────────────────────────────────────────────────────
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+
+      - name: Install SAM CLI
+        run: pip install aws-sam-cli
+
+      - name: sam build
+        run: sam build --use-container
+
+      - name: Upload SAM build artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sam-build
+          path: .aws-sam # whole build dir
+
+  # ───────────────────────────────────────────────────────────────────────
+  # 3)  Deploy to *stage* and smoke-test it
+  # ───────────────────────────────────────────────────────────────────────
+  deploy-stage:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: stage
+    permissions:
+      id-token: write # OIDC
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+
+      - name: Restore SAM build
+        uses: actions/download-artifact@v4
+        with: { name: sam-build, path: .aws-sam }
+
+      - name: Configure AWS creds (stage)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_STAGE_ROLE }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Deploy to stage
+        run: |
+          sam deploy --config-env stage \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset
+
+      # Wait until CloudFormation is green (covers create OR update)
+      - name: Wait for stack complete
+        run: |
+          aws cloudformation wait stack-update-complete \
+            --stack-name $STACK_STAGE || \
+          aws cloudformation wait stack-create-complete \
+            --stack-name $STACK_STAGE
+
+      # Simple smoke test: invoke the Lambda once
+      - name: Smoke-invoke
+        run: |
+          FN=$(aws cloudformation describe-stacks \
+                 --stack-name $STACK_STAGE \
+                 --query "Stacks[0].Outputs[?OutputKey=='FunctionArn'].OutputValue" \
+                 --output text)
+          aws lambda invoke --function-name "$FN" \
+            --payload '{}' --cli-binary-format raw-in-base64-out response.json
+          cat response.json
+
+  # ───────────────────────────────────────────────────────────────────────
+  # 4)  Promote the SAME artefact to *prod*
+  # ───────────────────────────────────────────────────────────────────────
+  deploy-prod:
+    needs: deploy-stage # ← only runs if stage passed
+    runs-on: ubuntu-latest
+    environment: prod # add GitHub env-level protections if you want manual approval
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+
+      - name: Restore SAM build
+        uses: actions/download-artifact@v4
+        with: { name: sam-build, path: .aws-sam }
+
+      - name: Configure AWS creds (prod)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_PROD_ROLE }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Deploy to prod
+        run: |
+          sam deploy --config-env prod \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset
