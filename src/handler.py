@@ -7,9 +7,10 @@ log.setLevel(logging.INFO)
 
 BUCKET       = os.environ["BUCKET_NAME"]          # pass via template if you like
 ENV          = os.environ["RAW_PREFIX"].split("/")[1]  # "stage" or "prod"
-RAW_PREFIX   = os.environ["RAW_PREFIX"]           # stage/raw
-PROC_PREFIX  = os.environ["PROC_PREFIX"]          # stage/processed
-DB_URI       = os.environ["DB_URI"]               # s3://bucket/stage/db/scraper-dk.duckdb
+S3PREFIX     = os.environ["RAW_PREFIX"].split("/")[0]  # s3prefix
+RAW_PREFIX   = os.environ["RAW_PREFIX"]           # s3prefix/stage/raw
+PROC_PREFIX  = os.environ["PROC_PREFIX"]          # s3prefix/stage/processed
+DB_URI       = os.environ["DB_URI"]               # s3://bucket/s3prefix/stage/db/scraper-dk.duckdb
 LATEST_KEY   = f"{ENV}/latest.json"
 
 def lambda_handler(event, context):
@@ -43,7 +44,7 @@ def lambda_handler(event, context):
     # 3. ─ update DuckDB (download → insert → upload)
     local_db = pathlib.Path(tempfile.gettempdir()) / "scraper-dk.duckdb"
     try:
-        s3.download_file(BUCKET, f"{ENV}/db/scraper-dk.duckdb", str(local_db))
+        s3.download_file(BUCKET, f"{S3PREFIX}/{ENV}/db/scraper-dk.duckdb", str(local_db))
     except botocore.exceptions.ClientError as e:
         if e.response["Error"]["Code"] != "404":
             raise
@@ -56,7 +57,7 @@ def lambda_handler(event, context):
                 (ts, row["value1"], row["value2"]))
     con.execute("CHECKPOINT")
     con.close()
-    s3.upload_file(str(local_db), BUCKET, f"{ENV}/db/scraper-dk.duckdb")
+    s3.upload_file(str(local_db), BUCKET, f"{S3PREFIX}/{ENV}/db/scraper-dk.duckdb")
     log.info("Upserted DuckDB")
 
     # 4. ─ overwrite 'latest' flat file for the frontend
