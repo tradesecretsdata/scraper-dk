@@ -28,7 +28,8 @@ Globals:
         RAW_PREFIX: !Sub "${S3Prefix}/${Env}/raw"
         PROC_PREFIX: !Sub "${S3Prefix}/${Env}/processed"
         DB_URI: !Sub "s3://${BucketName}/${S3Prefix}/${Env}/db/scraper-dk.duckdb"
-        BUCKET_NAME: !Ref tradesecretsdata
+        API_URL: !Ref ApiUrl
+        BUCKET_NAME: !Ref BucketName
 
 Resources:
   ScraperFunction:
