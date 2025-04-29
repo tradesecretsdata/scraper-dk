@@ -1,32 +1,10 @@
-# ── Python build artefacts ─────────────────────────────
-__pycache__/
-*.py[cod]
-*.egg-info/
-.mypy_cache/
-.ruff_cache/
-
-# ── Virtual-envs ───────────────────────────────────────
-.venv/
+.aws-sam/
 venv/
-
-# ── SAM build + CloudFormation junk ───────────────────
-.aws-sam/                # ‘sam build’ output
-.sam-cache/              # SAM Accelerate
-.packaged.yaml           # sam package output
-
-# ── Local data & test artefacts ───────────────────────
-*.duckdb                 # snapshots you download for CLI queries
+*__pycache__*
+*.duckdb
+*.db
 *.parquet
-*.json                   # raw / processed test blobs
-tests/__pycache__/
-
-# ── Secrets & developer-only config ───────────────────
-.env                     # dotenv file (user-specific)
-.env.*                   # .env.stage, .env.local, etc.
-samconfig.local.toml     # optional per-dev overrides
-*.pem                    # SSH keys, etc.
-
-# ── Editor / OS noise ─────────────────────────────────
-.idea/
-.vscode/
-.DS_Store
+*.json
+.env
+samconfig.local.toml
+*.pem
