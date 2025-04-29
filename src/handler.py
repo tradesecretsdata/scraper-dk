@@ -1,19 +1,41 @@
-import os, json, random, datetime, tempfile, pathlib, logging, botocore
-import boto3, duckdb, pyarrow as pa, pyarrow.parquet as pq
+import os
+import json
+import random
+import datetime
+import tempfile
+import pathlib
+import logging
+import botocore
+import boto3
+import duckdb
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 s3 = boto3.client("s3")
 log = logging.getLogger()
 log.setLevel(logging.INFO)
 
-BUCKET       = os.environ["BUCKET_NAME"]          # pass via template if you like
-ENV          = os.environ["RAW_PREFIX"].split("/")[1]  # "stage" or "prod"
-S3PREFIX     = os.environ["RAW_PREFIX"].split("/")[0]  # s3prefix
-RAW_PREFIX   = os.environ["RAW_PREFIX"]           # s3prefix/stage/raw
-PROC_PREFIX  = os.environ["PROC_PREFIX"]          # s3prefix/stage/processed
-DB_URI       = os.environ["DB_URI"]               # s3://bucket/s3prefix/stage/db/scraper-dk.duckdb
-LATEST_KEY   = f"{S3PREFIX}/{ENV}/latest.json"
+
+def load_env():
+    """Read and parse env vars every invocation (cheap)."""
+    BUCKET = os.environ["BUCKET_NAME"]
+    RAW_PREFIX = os.environ["RAW_PREFIX"]  # e.g. scraper-dk/stage/raw
+    PROC_PREFIX = os.environ["PROC_PREFIX"]
+    DB_URI = os.environ["DB_URI"]
+
+    # derive helpers
+    parts = RAW_PREFIX.split("/")  # ["scraper-dk", "stage", "raw"]
+    S3PREFIX, ENV = parts[0], parts[1]
+    LATEST_KEY = f"{S3PREFIX}/{ENV}/latest.json"
+    DB_KEY = f"{S3PREFIX}/{ENV}/db/scraper-dk.duckdb"
+    return BUCKET, ENV, S3PREFIX, RAW_PREFIX, PROC_PREFIX, DB_URI, LATEST_KEY, DB_KEY
+
 
 def lambda_handler(event, context):
+    (BUCKET, ENV, S3PREFIX, RAW_PREFIX, PROC_PREFIX, DB_URI, LATEST_KEY, DB_KEY) = (
+        load_env()
+    )
+
     print("Env variables:")
     print(f"Bucket: {BUCKET}")
     print(f"Env: {ENV}")
@@ -44,7 +66,7 @@ def lambda_handler(event, context):
     # 3. ─ update DuckDB (download → insert → upload)
     local_db = pathlib.Path(tempfile.gettempdir()) / "scraper-dk.duckdb"
     try:
-        s3.download_file(BUCKET, f"{S3PREFIX}/{ENV}/db/scraper-dk.duckdb", str(local_db))
+        s3.download_file(BUCKET, DB_KEY, str(local_db))
     except botocore.exceptions.ClientError as e:
         if e.response["Error"]["Code"] != "404":
             raise
@@ -53,16 +75,20 @@ def lambda_handler(event, context):
     con.execute(
         "CREATE TABLE IF NOT EXISTS readings(scraped_at TIMESTAMP, value1 DOUBLE, value2 INTEGER);"
     )
-    con.execute("INSERT INTO readings VALUES (?, ?, ?)",
-                (ts, row["value1"], row["value2"]))
+    con.execute(
+        "INSERT INTO readings VALUES (?, ?, ?)", (ts, row["value1"], row["value2"])
+    )
     con.execute("CHECKPOINT")
     con.close()
-    s3.upload_file(str(local_db), BUCKET, f"{S3PREFIX}/{ENV}/db/scraper-dk.duckdb")
+    s3.upload_file(str(local_db), BUCKET, DB_KEY)
     log.info("Upserted DuckDB")
 
     # 4. ─ overwrite 'latest' flat file for the frontend
-    s3.put_object(Bucket=BUCKET, Key=f"{LATEST_KEY}",
-                  Body=json.dumps(row).encode(),
-                  ContentType="application/json")
+    s3.put_object(
+        Bucket=BUCKET,
+        Key=f"{LATEST_KEY}",
+        Body=json.dumps(row).encode(),
+        ContentType="application/json",
+    )
 
     return {"statusCode": 200, "body": json.dumps({"ok": True})}
