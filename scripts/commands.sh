@@ -2,6 +2,21 @@
 # scripts/commands.sh
 
 ########################################
+# Formatting / Linting / Local Testing
+########################################
+# Format code & check
+black src tests
+black --check src tests
+
+# Run unit tests
+pytest
+
+# Build and invoke
+# NOTE: must use env-vars because it, unlike .env, has priority over template.yaml
+sam build --use-container
+sam local invoke ScraperFunction --env-vars env-dev.json
+
+########################################
 # Environment
 ########################################
 source .env # Before running scripts
