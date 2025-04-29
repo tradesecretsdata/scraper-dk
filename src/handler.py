@@ -61,7 +61,7 @@ def lambda_handler(event, context):
     log.info("Upserted DuckDB")
 
     # 4. ─ overwrite 'latest' flat file for the frontend
-    s3.put_object(Bucket=BUCKET, Key=LATEST_KEY,
+    s3.put_object(Bucket=BUCKET, Key=f"{S3PREFIX}/{LATEST_KEY}",
                   Body=json.dumps(row).encode(),
                   ContentType="application/json")
 

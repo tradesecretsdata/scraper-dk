@@ -41,7 +41,7 @@ Resources:
                 Resource: !Sub arn:aws:s3:::${BucketName}
                 Condition:
                   StringLike:
-                    s3:prefix: "${S3Prefix}/stage/*"
+                    s3:prefix: !Sub "${S3Prefix}/stage/*"
               # CloudWatch Logs
               - Effect: Allow
                 Action: logs:*
@@ -70,7 +70,7 @@ Resources:
                 Resource: !Sub arn:aws:s3:::${BucketName}
                 Condition:
                   StringLike:
-                    s3:prefix: "${S3Prefix}/prod/*"
+                    s3:prefix: !Sub "${S3Prefix}/prod/*"
               - Effect: Allow
                 Action: logs:*
                 Resource: arn:aws:logs:*:*:*
