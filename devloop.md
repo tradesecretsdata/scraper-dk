@@ -1,10 +1,9 @@
 - Create dev branch
 - Make changes
-- SAM build
-- Run tests
-- ??? Other tests? make sure logic works?
+- SAM build and test locally
+- Commit changes
 - Push dev
 - Merge dev to main
 - Push main
 - Github actions deploys staging
-- ??? Automatic deploy to prod if staging passes
+- Once staging is green for 10 min, github actions deploys prod
