@@ -6,13 +6,21 @@ log = logging.getLogger()
 log.setLevel(logging.INFO)
 
 BUCKET       = os.environ["BUCKET_NAME"]          # pass via template if you like
-ENV          = os.environ["RAW_PREFIX"].split("/")[0]  # "stage" or "prod"
+ENV          = os.environ["RAW_PREFIX"].split("/")[1]  # "stage" or "prod"
 RAW_PREFIX   = os.environ["RAW_PREFIX"]           # stage/raw
 PROC_PREFIX  = os.environ["PROC_PREFIX"]          # stage/processed
 DB_URI       = os.environ["DB_URI"]               # s3://bucket/stage/db/scraper-dk.duckdb
 LATEST_KEY   = f"{ENV}/latest.json"
 
 def lambda_handler(event, context):
+    print("Env variables:")
+    print(f"Bucket: {BUCKET}")
+    print(f"Env: {ENV}")
+    print(f"Raw prefix: {RAW_PREFIX}")
+    print(f"Proc prefix: {PROC_PREFIX}")
+    print(f"Db uri: {DB_URI}")
+    print(f"latest key: {LATEST_KEY}")
+
     ts = datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
     row = {
         "scraped_at": ts,
