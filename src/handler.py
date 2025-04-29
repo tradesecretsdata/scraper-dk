@@ -11,7 +11,7 @@ S3PREFIX     = os.environ["RAW_PREFIX"].split("/")[0]  # s3prefix
 RAW_PREFIX   = os.environ["RAW_PREFIX"]           # s3prefix/stage/raw
 PROC_PREFIX  = os.environ["PROC_PREFIX"]          # s3prefix/stage/processed
 DB_URI       = os.environ["DB_URI"]               # s3://bucket/s3prefix/stage/db/scraper-dk.duckdb
-LATEST_KEY   = f"{ENV}/latest.json"
+LATEST_KEY   = f"{S3PREFIX}/{ENV}/latest.json"
 
 def lambda_handler(event, context):
     print("Env variables:")
@@ -61,7 +61,7 @@ def lambda_handler(event, context):
     log.info("Upserted DuckDB")
 
     # 4. ─ overwrite 'latest' flat file for the frontend
-    s3.put_object(Bucket=BUCKET, Key=f"{S3PREFIX}/{LATEST_KEY}",
+    s3.put_object(Bucket=BUCKET, Key=f"{LATEST_KEY}",
                   Body=json.dumps(row).encode(),
                   ContentType="application/json")
 
