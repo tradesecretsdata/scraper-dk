@@ -5,9 +5,9 @@ on:
     branches: [main]
 
 env:
-  AWS_REGION: us-east-1
-  S3_ARTIFACT_BUCKET: my-sam-artifacts # bucket SAM uses for code zips
-  S3_ARTIFACT_PREFIX: sam
+  AWS_REGION: us-east-2
+  S3_ARTIFACT_BUCKET: tradesecretsdata # bucket SAM uses for code zips
+  S3_ARTIFACT_PREFIX: sam-artifacts
   STACK_STAGE: pipeline-stage
   STACK_PROD: pipeline-prod
 
