@@ -11,7 +11,6 @@ import duckdb
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-s3 = boto3.client("s3")
 log = logging.getLogger()
 log.setLevel(logging.INFO)
 
@@ -32,6 +31,7 @@ def load_env():
 
 
 def lambda_handler(event, context):
+    # Load env variables
     (BUCKET, ENV, S3PREFIX, RAW_PREFIX, PROC_PREFIX, DB_URI, LATEST_KEY, DB_KEY) = (
         load_env()
     )
@@ -43,6 +43,9 @@ def lambda_handler(event, context):
     print(f"Proc prefix: {PROC_PREFIX}")
     print(f"Db uri: {DB_URI}")
     print(f"latest key: {LATEST_KEY}")
+
+    # S3 client
+    s3 = boto3.client("s3")
 
     ts = datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
     row = {

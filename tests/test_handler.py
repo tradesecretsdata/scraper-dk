@@ -1,23 +1,23 @@
 import os
 import pathlib
+import importlib
 import boto3
 import sys
 from moto import mock_aws
 import pytest
 
-# import the Lambda entrypoint
 sys.path.append(str(pathlib.Path(__file__).parents[1] / "src"))
-from handler import lambda_handler
 
 
 @pytest.fixture
-def s3_and_env(monkeypatch):
-    """Create fake S3 + env vars that handler.py expects."""
-    bucket = "unit-test-bucket"
+def s3_env(monkeypatch):
+    bucket = "tradesecretsdata"  # ← your real bucket
     monkeypatch.setenv("BUCKET_NAME", bucket)
-    monkeypatch.setenv("RAW_PREFIX", "scraper-dk/stage/raw")
-    monkeypatch.setenv("PROC_PREFIX", "scraper-dk/stage/processed")
-    monkeypatch.setenv("DB_URI", f"s3://{bucket}/scraper-dk/stage/db/scraper-dk.duckdb")
+    monkeypatch.setenv("RAW_PREFIX", "scraper-dk/unit-test/raw")
+    monkeypatch.setenv("PROC_PREFIX", "scraper-dk/unit-test/processed")
+    monkeypatch.setenv(
+        "DB_URI", f"s3://{bucket}/scraper-dk/unit-test/db/scraper-dk.duckdb"
+    )
 
     with mock_aws():
         s3 = boto3.client("s3", region_name="us-east-1")
@@ -25,26 +25,29 @@ def s3_and_env(monkeypatch):
         yield s3
 
 
-def test_handler_writes_all_objects(s3_and_env):
-    """Lambda should create raw JSON, Parquet, DB, and latest.json."""
-    s3 = s3_and_env
-    response = lambda_handler({}, {})
+def test_handler_writes_objects(s3_env):
+    # re-import handler *after* moto + env are set
+    import handler
 
-    assert response["statusCode"] == 200
+    importlib.reload(handler)
 
+    resp = handler.lambda_handler({}, {})
+    assert resp["statusCode"] == 200
+
+    s3 = s3_env
     keys = {
-        obj["Key"]
-        for obj in s3.list_objects_v2(Bucket=os.environ["BUCKET_NAME"]).get(
+        o["Key"]
+        for o in s3.list_objects_v2(Bucket=os.environ["BUCKET_NAME"]).get(
             "Contents", []
         )
     }
 
     assert any(
-        k.startswith("scraper-dk/stage/raw/") and k.endswith(".json") for k in keys
+        k.endswith(".json") and k.startswith("scraper-dk/unit-test/raw/") for k in keys
     )
     assert any(
-        k.startswith("scraper-dk/stage/processed/") and k.endswith(".parquet")
+        k.endswith(".parquet") and k.startswith("scraper-dk/unit-test/processed/")
         for k in keys
     )
-    assert "scraper-dk/stage/db/scraper-dk.duckdb" in keys
-    assert "scraper-dk/stage/latest.json" in keys
+    assert "scraper-dk/unit-test/db/scraper-dk.duckdb" in keys
+    assert "scraper-dk/unit-test/latest.json" in keys
