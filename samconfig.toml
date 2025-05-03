@@ -2,7 +2,7 @@ version = 0.1
 
 # Shared build flags
 [default.build.parameters]
-use_container = true
+#use_container = true
 
 # Stage
 [stage.deploy.parameters]
