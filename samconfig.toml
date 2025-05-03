@@ -8,7 +8,8 @@ use_container = true
 [stage.deploy.parameters]
 stack_name = "pipeline-stage"
 resolve_s3 = true
-s3_prefix = "pipeline-stage"
+s3_bucket = "tradesecretsdata"
+s3_prefix = "scraper-dk/stage/sam-artifacts"
 region = "us-east-2"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
@@ -20,7 +21,8 @@ image_repositories = []
 [prod.deploy.parameters]
 stack_name = "pipeline-prod"
 resolve_s3 = true
-s3_prefix = "pipeline-prod"
+s3_bucket = "tradesecretsdata"
+s3_prefix = "scraper-dk/prod/sam-artifacts"
 region = "us-east-2"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"

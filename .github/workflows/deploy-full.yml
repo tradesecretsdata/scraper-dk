@@ -83,9 +83,6 @@ jobs:
           role-to-assume: ${{ secrets.AWS_STAGE_ROLE }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Who am I?
-        run: aws sts get-caller-identity
-
       - name: Deploy to stage
         run: |
           sam deploy --config-env stage \
