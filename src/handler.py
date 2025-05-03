@@ -51,7 +51,7 @@ def lambda_handler(event, context):
     row = {
         "scraped_at": ts,
         "value1": round(random.random(), 5),
-        "value2": random.randint(0, 100),
+        "value2": random.randint(0, 1000),
     }
     # 1. ─ raw JSON
     raw_key = f"{RAW_PREFIX}/{ts}.json"
