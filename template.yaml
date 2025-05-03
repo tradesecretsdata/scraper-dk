@@ -1,9 +1,9 @@
-AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: Serverless scraping pipeline
 
 Parameters:
-  Env:               # stage | prod
+  Env: # stage | prod
     Type: String
     AllowedValues: [stage, prod]
   BucketName:
@@ -12,7 +12,7 @@ Parameters:
     Type: String
   RoleArn:
     Type: String
-  ApiUrl:            
+  ApiUrl:
     Type: String
     Default: ""
 
@@ -21,7 +21,7 @@ Globals:
     Runtime: python3.12
     MemorySize: 128
     Timeout: 30
-    Architectures: [arm64]
+    Architectures: [x86_64]
     Handler: handler.lambda_handler
     Environment:
       Variables:
@@ -36,7 +36,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: src/
-      Role:  !Ref RoleArn
+      Role: !Ref RoleArn
       Events:
         FiveMinuteSchedule:
           Type: Schedule
@@ -45,7 +45,7 @@ Resources:
               - IsProd
               - "rate(5 minutes)"
               - "rate(30 minutes)"
-      Layers: []          # add libs layer if size > 250 MB
+      Layers: [] # add libs layer if size > 250 MB
 
   # OPTIONAL: CloudWatch metric + alarm straight in CFN
   ErrorAlarm:
@@ -63,11 +63,11 @@ Resources:
       Threshold: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
       TreatMissingData: notBreaching
-      AlarmActions: []   # fill with SNS ARN if you wired one
+      AlarmActions: [] # fill with SNS ARN if you wired one
 
 Conditions:
-  IsProd: !Equals [ !Ref Env, "prod" ]
+  IsProd: !Equals [!Ref Env, "prod"]
 
 Outputs:
   FunctionArn: { Value: !GetAtt ScraperFunction.Arn }
-  BucketName:  { Value: !Ref BucketName }
+  BucketName: { Value: !Ref BucketName }

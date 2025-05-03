@@ -13,7 +13,8 @@ pytest
 
 # Build and invoke
 # NOTE: must use env-vars because it, unlike .env, has priority over template.yaml
-sam build --use-container
+# NOTE: optionally remove --use-container for faster (x86-64 instead of arm64) build
+sam build --use-container --debug
 sam local invoke ScraperFunction --env-vars env-dev.json
 
 ########################################
