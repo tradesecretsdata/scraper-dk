@@ -77,14 +77,14 @@ jobs:
         uses: actions/download-artifact@v4
         with: { name: sam-build, path: .aws-sam }
 
-      - name: Who am I?
-        run: aws sts get-caller-identity
-
       - name: Configure AWS creds (stage)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_STAGE_ROLE }}
           aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Who am I?
+        run: aws sts get-caller-identity
 
       - name: Deploy to stage
         run: |
