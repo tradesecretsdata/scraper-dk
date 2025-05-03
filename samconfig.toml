@@ -7,7 +7,6 @@ use_container = true
 # Stage
 [stage.deploy.parameters]
 stack_name = "pipeline-stage"
-resolve_s3 = true
 s3_bucket = "tradesecretsdata"
 s3_prefix = "scraper-dk/stage/sam-artifacts"
 region = "us-east-2"
@@ -20,7 +19,6 @@ image_repositories = []
 # Prod (CI/CD uses this)
 [prod.deploy.parameters]
 stack_name = "pipeline-prod"
-resolve_s3 = true
 s3_bucket = "tradesecretsdata"
 s3_prefix = "scraper-dk/prod/sam-artifacts"
 region = "us-east-2"
