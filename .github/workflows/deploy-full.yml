@@ -51,15 +51,6 @@ jobs:
       - name: sam build
         run: sam build
 
-      - name: Debug ‑ list tree
-        run: |
-          echo "::group::Workspace root"
-          ls -al
-          echo "::endgroup::"
-          echo "::group::.aws-sam tree"
-          ls -R .aws-sam || true
-          echo "::endgroup::"
-
       - name: Upload SAM build artefact
         uses: actions/upload-artifact@v4
         with:
@@ -91,6 +82,9 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_STAGE_ROLE }}
           aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Who am I?
+        run: aws sts get-caller-identity
 
       - name: Deploy to stage
         run: |
