@@ -55,7 +55,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: sam-build
-          path: .aws-sam # whole build dir
+          path: .aws-sam/**
+          if-no-files-found: error # fail fast if no build under .aws-sam
 
   # ───────────────────────────────────────────────────────────────────────
   # 3)  Deploy to *stage* and smoke-test it
