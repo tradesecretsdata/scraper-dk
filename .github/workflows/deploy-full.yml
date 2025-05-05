@@ -52,13 +52,13 @@ jobs:
         run: ls -al src
 
       - name: sam build
-        run: sam build
+        run: sam build --debug
 
       - name: Upload SAM build artefact
         uses: actions/upload-artifact@v4
         with:
           name: sam-build
-          path: .aws-sam/build/**
+          path: .aws-sam/build # removed /** here to debug, but thought I added that earlier for a reason
           if-no-files-found: error # fail fast if no build under .aws-sam
 
   # ───────────────────────────────────────────────────────────────────────
@@ -89,6 +89,7 @@ jobs:
       - name: Deploy to stage
         run: |
           sam deploy --config-env stage \
+            --no-build \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset
 
@@ -139,5 +140,6 @@ jobs:
       - name: Deploy to prod
         run: |
           sam deploy --config-env prod \
+            --no-build \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset
