@@ -48,6 +48,9 @@ jobs:
       - name: Install SAM CLI
         run: pip install aws-sam-cli
 
+      - name: List src folder (debug) # debug
+        run: ls -al src
+
       - name: sam build
         run: sam build
 
