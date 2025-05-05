@@ -58,7 +58,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: sam-build
-          path: .aws-sam/build # removed /** here to debug, but thought I added that earlier for a reason
+          path: .aws-sam/build/**
           if-no-files-found: error # fail fast if no build under .aws-sam
 
   # ───────────────────────────────────────────────────────────────────────
