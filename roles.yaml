@@ -91,7 +91,7 @@ Resources:
             Action: sts:AssumeRoleWithWebIdentity
             Condition:
               StringLike:
-                "token.actions.githubusercontent.com:sub": !Sub "repo:${Repo}:ref:refs/heads/main"
+                "token.actions.githubusercontent.com:sub": !Sub "repo:${Repo}:environment:stage"
               StringEquals:
                 "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
       Policies:
@@ -142,7 +142,7 @@ Resources:
             Action: sts:AssumeRoleWithWebIdentity
             Condition:
               StringLike:
-                "token.actions.githubusercontent.com:sub": !Sub "repo:${Repo}:ref:refs/heads/main"
+                "token.actions.githubusercontent.com:sub": !Sub "repo:${Repo}:environment:prod"
               StringEquals:
                 "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
       Policies:
