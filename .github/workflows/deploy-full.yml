@@ -92,6 +92,7 @@ jobs:
       - name: Deploy to stage
         run: |
           sam deploy --config-env stage \
+            --stack-name $STACK_STAGE \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
             --template-file .aws-sam/build/template.yaml
@@ -143,6 +144,7 @@ jobs:
       - name: Deploy to prod
         run: |
           sam deploy --config-env prod \
+            --stack-name $STACK_PROD \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
             --template-file .aws-sam/build/template.yaml
