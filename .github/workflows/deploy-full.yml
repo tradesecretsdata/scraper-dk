@@ -89,7 +89,6 @@ jobs:
       - name: Deploy to stage
         run: |
           sam deploy --config-env stage \
-            --no-build \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset
 
@@ -140,6 +139,5 @@ jobs:
       - name: Deploy to prod
         run: |
           sam deploy --config-env prod \
-            --no-build \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset
