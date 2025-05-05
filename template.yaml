@@ -58,12 +58,13 @@ Resources:
         - Name: FunctionName
           Value: !Ref ScraperFunction
       Statistic: Sum
-      Period: 900
+      Period: 300
       EvaluationPeriods: 1
       Threshold: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
       TreatMissingData: notBreaching
-      AlarmActions: [] # fill with SNS ARN if you wired one
+      AlarmActions:
+        - arn:aws:sns:us-east-2:688035104276:lambda-alerts
 
 Conditions:
   IsProd: !Equals [!Ref Env, "prod"]
