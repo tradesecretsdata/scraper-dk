@@ -25,6 +25,7 @@ source .env # Before running scripts
 ########################################
 # Cloudformation
 ########################################
+# NOTE: if .env has not been activated, roles will be deployed with incorrect permissions
 aws cloudformation deploy \
   --stack-name pipeline-roles \
   --template-file roles.yaml \

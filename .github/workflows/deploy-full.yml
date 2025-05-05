@@ -54,6 +54,9 @@ jobs:
       - name: sam build
         run: sam build --debug
 
+      - name: list build directory
+        run: ls -R .aws-sam/build
+
       - name: Upload SAM build artefact
         uses: actions/upload-artifact@v4
         with:
@@ -90,7 +93,8 @@ jobs:
         run: |
           sam deploy --config-env stage \
             --no-confirm-changeset \
-            --no-fail-on-empty-changeset
+            --no-fail-on-empty-changeset \
+            --template-file .aws-sam/build/template.yaml
 
       # Wait until CloudFormation is green (covers create OR update)
       - name: Wait for stack complete
@@ -140,4 +144,5 @@ jobs:
         run: |
           sam deploy --config-env prod \
             --no-confirm-changeset \
-            --no-fail-on-empty-changeset
+            --no-fail-on-empty-changeset \
+            --template-file .aws-sam/build/template.yaml
