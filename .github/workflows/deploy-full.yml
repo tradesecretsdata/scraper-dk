@@ -81,7 +81,7 @@ jobs:
 
       - name: Restore SAM build
         uses: actions/download-artifact@v4
-        with: { name: sam-build, path: .aws-sam }
+        with: { name: sam-build, path: . }
 
       - name: Configure AWS creds (stage)
         uses: aws-actions/configure-aws-credentials@v4
@@ -92,8 +92,8 @@ jobs:
       - name: List folder contents and pwd (debug)
         run: ls -al
 
-      - name: print directory
-        run: pwd
+      - name: print contents of .aws-sam/build
+        run: cd .aws-sam/build && ls -al
 
       - name: Deploy to stage
         run: |
@@ -139,7 +139,7 @@ jobs:
 
       - name: Restore SAM build
         uses: actions/download-artifact@v4
-        with: { name: sam-build, path: .aws-sam }
+        with: { name: sam-build, path: . }
 
       - name: Configure AWS creds (prod)
         uses: aws-actions/configure-aws-credentials@v4
