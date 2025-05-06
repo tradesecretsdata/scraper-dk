@@ -89,11 +89,11 @@ jobs:
           role-to-assume: ${{ secrets.AWS_STAGE_ROLE }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: List folder contents and pwd (debug)
+      - name: List folder contents (debug)
         run: ls -al
 
-      - name: print contents of .aws-sam/build
-        run: cd .aws-sam/build && ls -al
+      - name: print pwd
+        run: pwd
 
       - name: Deploy to stage
         run: |
@@ -101,7 +101,7 @@ jobs:
             --stack-name $STACK_STAGE \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
-            --template-file .aws-sam/build/template.yaml
+            --template-file template.yaml
 
       # Wait until CloudFormation is green (covers create OR update)
       - name: Wait for stack complete
@@ -153,4 +153,4 @@ jobs:
             --stack-name $STACK_PROD \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
-            --template-file .aws-sam/build/template.yaml
+            --template-file template.yaml
