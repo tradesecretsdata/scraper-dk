@@ -103,14 +103,6 @@ jobs:
             --no-fail-on-empty-changeset \
             --template-file template.yaml
 
-      # Wait until CloudFormation is green (covers create OR update)
-      - name: Wait for stack complete
-        run: |
-          aws cloudformation wait stack-update-complete \
-            --stack-name $STACK_STAGE || \
-          aws cloudformation wait stack-create-complete \
-            --stack-name $STACK_STAGE
-
       # Simple smoke test: invoke the Lambda once
       - name: Smoke-invoke
         run: |
