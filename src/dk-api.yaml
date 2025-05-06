@@ -1,0 +1,72 @@
+# dk-api.yaml
+
+mlb:
+  eventGroupId: 84240
+  categories:
+    "Game Lines":
+      categoryId: 493
+      subCategories:
+        "Game":
+          subCategoryId: 4519
+        "Alternate Run Line":
+          subCategoryId: 13168
+        "Alternate Total Runs":
+          subCategoryId: 13169
+        "Listed Pitcher":
+          subCategoryId: 6618
+        "Total Runs (3-Way)":
+          subCategoryId: 6694
+    "Batter Props":
+      categoryId: 743
+      subcategories:
+        "Home Runs":
+          subCategoryId: 17319
+        "Hits":
+          subCategoryId: 17320
+        "Total Bases":
+          subCategoryId: 17321
+        "RBIs":
+          subCategoryId: 17322
+        "Hits + Runs + RBIs O/U":
+          subCategoryId: 17406
+        "Hits O/U":
+          subCategoryId: 6719
+        "Total Bases O/U":
+          subCategoryId: 6607
+        "RBIs O/U":
+          subCategoryId: 8025
+        "Runs O/U":
+          subCategoryId: 17407
+        "Stolen Bases O/U":
+          subCategoryId: 17408
+        "Singles O/U":
+          subCategoryId: 17409
+        "Doubles O/U":
+          subCategoryId: 17410
+        "Walks (Batter) O/U":
+          subCategoryId: 17411
+        "Triples O/U":
+          subCategoryId: 17439
+    "Pitcher Props":
+      categoryId: 1031
+      subcategories:
+        "Strikeouts Thrown":
+          subCategoryId: 17323
+        "Strikeouts Thrown O/U":
+          subCategoryId: 15221
+        "Race to Strikeouts":
+          subCategoryId: 16164
+        "To Record a Win":
+          subCategoryId: 9884
+        "Hits Allowed":
+          subCategoryId: 17324
+        "Hits Allowed O/U":
+          subCategoryId: 9886
+        "Outs Recorded O/U":
+          subCategoryId: 17413
+        "Earned Runs Allowed O/U":
+          subCategoryId: 17412
+        "Walks Allowed":
+          subCategoryId: 17325
+        "Walks Allowed O/U":
+          subCategoryId: 15219

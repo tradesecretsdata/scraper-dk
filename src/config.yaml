@@ -1,0 +1,16 @@
+# config.yaml
+
+requests:
+  baseUrl: "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusmd/v1"
+  headers:
+    user-agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 Edg/135.0.0.0"
+    origin: "https://sportsbook.draftkings.com"
+    referer: "https://sportsbook.draftkings.com/"
+    accept: "application/json"
+    accept-encoding: "gzip, deflate, br, zstd"
+    accept-language: "en-US,en;q=0.9"
+  sleepSecondsMin: 3
+  sleepSecondsMax: 10
+  retriesMax: 10
+  timeout: 10
+proxies:
