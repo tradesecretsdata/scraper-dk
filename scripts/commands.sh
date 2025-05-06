@@ -89,3 +89,22 @@ duckdb $S3_PREFIX.duckdb -c \
 duckdb $S3_PREFIX.duckdb -c \
   "SELECT MIN(scraped_at), MAX(scraped_at) FROM readings;"
 
+########################################
+# Pause job (disable schedule)
+########################################
+# Find the event rule
+aws events list-rules --name-prefix pipeline-
+# Disable stage
+aws events disable-rule --name pipeline-stage-ScraperFunctionFiveMinuteSchedule-R9xPVQD3k3KL
+# Disable prod
+aws events disable-rule --name pipeline-prod-ScraperFunctionFiveMinuteSchedule-B45CwfGNf0t7
+
+########################################
+# Clear mock data from S3 bucket
+########################################
+# S3
+aws s3 rm s3://$BUCKET_NAME/$S3_PREFIX/$ENV/raw   --recursive
+aws s3 rm s3://$BUCKET_NAME/$S3_PREFIX/$ENV/processed --recursive
+aws s3 rm s3://$BUCKET_NAME/$S3_PREFIX/$ENV/db/scraper-dk.duckdb
+
+
