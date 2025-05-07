@@ -20,7 +20,7 @@ Globals:
   Function:
     Runtime: python3.12
     MemorySize: 128
-    Timeout: 30
+    Timeout: 300
     Architectures: [x86_64]
     Handler: handler.lambda_handler
     Environment:
