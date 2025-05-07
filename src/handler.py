@@ -1,97 +1,92 @@
-import os
-import json
-import random
-import datetime
-import tempfile
-import pathlib
+"""AWS Lambda entry‑point for the DraftKings fetch job.
+
+The function simply delegates to ``pipeline.fetch.main`` which:
+  • builds the endpoints defined in ``dk-api.yaml``
+  • downloads each JSON payload
+  • uploads the raw data to S3 at the key pattern documented there
+
+Project layout (relative to the repo root ``src/``)::
+
+    src/
+    ├── config.yaml
+    ├── dk-api.yaml
+    ├── handler.py          # ← this file (Lambda handler)
+    └── pipeline/
+        └── fetch.py
+
+Environment variables required (same as ``fetch.py``):
+    BucketName  – S3 bucket to write into (required)
+    S3Prefix    – optional path prefix (no leading /)
+    Env         – environment name (e.g. dev / prod); default "dev"
+
+Deploy notes
+------------
+* Package all files under ``src/`` plus third‑party dependencies
+  (``requests``, ``boto3``, ``PyYAML``) into the Lambda layer or zip.
+* Set the Lambda handler to ``handler.lambda_handler``.
+"""
+
+from __future__ import annotations
+
 import logging
-import botocore
-import boto3
-import duckdb
-import pyarrow as pa
-import pyarrow.parquet as pq
+import traceback
+from typing import Any, Dict
 
-log = logging.getLogger()
-log.setLevel(logging.INFO)
-
-
-def load_env():
-    """Read and parse env vars every invocation (cheap)."""
-    BUCKET = os.environ["BUCKET_NAME"]
-    RAW_PREFIX = os.environ["RAW_PREFIX"]  # e.g. scraper-dk/stage/raw
-    PROC_PREFIX = os.environ["PROC_PREFIX"]
-    DB_URI = os.environ["DB_URI"]
-
-    # derive helpers
-    parts = RAW_PREFIX.split("/")  # ["scraper-dk", "stage", "raw"]
-    S3PREFIX, ENV = parts[0], parts[1]
-    LATEST_KEY = f"{S3PREFIX}/{ENV}/latest.json"
-    DB_KEY = f"{S3PREFIX}/{ENV}/db/scraper-dk.duckdb"
-    return BUCKET, ENV, S3PREFIX, RAW_PREFIX, PROC_PREFIX, DB_URI, LATEST_KEY, DB_KEY
+# ---------------------------------------------------------------------------
+# Configure root logging – CloudWatch will capture stdout/stderr automatically
+# ---------------------------------------------------------------------------
+logging.basicConfig(
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    level=logging.INFO,
+    force=True,  # override any previous config
+)
+logger = logging.getLogger(__name__)
 
 
-def lambda_handler(event, context):
-    # Load env variables
-    (BUCKET, ENV, S3PREFIX, RAW_PREFIX, PROC_PREFIX, DB_URI, LATEST_KEY, DB_KEY) = (
-        load_env()
-    )
+# ---------------------------------------------------------------------------
+# Attempt to import the fetch routine
+# ---------------------------------------------------------------------------
+try:
+    # Normal import when ``pipeline`` is importable as a namespace package.
+    from pipeline.fetch import main as fetch_main  # type: ignore
+except ModuleNotFoundError:
+    # Fallback: add ``src/pipeline`` to sys.path and import the module directly.
+    import sys
+    from pathlib import Path
 
-    print("Env variables:")
-    print(f"Bucket: {BUCKET}")
-    print(f"Env: {ENV}")
-    print(f"Raw prefix: {RAW_PREFIX}")
-    print(f"Proc prefix: {PROC_PREFIX}")
-    print(f"Db uri: {DB_URI}")
-    print(f"latest key: {LATEST_KEY}")
-
-    # S3 client
-    s3 = boto3.client("s3")
-
-    ts = datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
-    row = {
-        "scraped_at": ts,
-        "value1": round(random.random(), 5),
-        "value2": random.randint(0, 1000),
-    }
-    # 1. ─ raw JSON
-    raw_key = f"{RAW_PREFIX}/{ts}.json"
-    s3.put_object(Bucket=BUCKET, Key=raw_key, Body=json.dumps(row).encode())
-    log.info("Wrote raw %s", raw_key)
-
-    # 2. ─ transform → Arrow → Parquet
-    tbl = pa.Table.from_pylist([row])
-    tmp_pq = pathlib.Path(tempfile.gettempdir()) / "batch.parquet"
-    pq.write_table(tbl, tmp_pq)
-    proc_key = f"{PROC_PREFIX}/{ts}.parquet"
-    s3.upload_file(str(tmp_pq), BUCKET, proc_key)
-    log.info("Wrote parquet %s", proc_key)
-
-    # 3. ─ update DuckDB (download → insert → upload)
-    local_db = pathlib.Path(tempfile.gettempdir()) / "scraper-dk.duckdb"
+    pipeline_path = Path(__file__).resolve().parent / "pipeline"
+    sys.path.append(str(pipeline_path))
     try:
-        s3.download_file(BUCKET, DB_KEY, str(local_db))
-    except botocore.exceptions.ClientError as e:
-        if e.response["Error"]["Code"] != "404":
-            raise
-        log.warning("DB not found; creating new one")
-    con = duckdb.connect(str(local_db))
-    con.execute(
-        "CREATE TABLE IF NOT EXISTS readings(scraped_at TIMESTAMP, value1 DOUBLE, value2 INTEGER);"
-    )
-    con.execute(
-        "INSERT INTO readings VALUES (?, ?, ?)", (ts, row["value1"], row["value2"])
-    )
-    con.execute("CHECKPOINT")
-    con.close()
-    s3.upload_file(str(local_db), BUCKET, DB_KEY)
-    log.info("Upserted DuckDB")
+        from fetch import main as fetch_main  # type: ignore  # noqa: E401
+    except ModuleNotFoundError as exc:  # pragma: no cover – irrecoverable
+        logger.error("Failed to import fetch.py: %s", exc)
+        raise
 
-    # 4. ─ overwrite 'latest' flat file for the frontend
-    s3.put_object(
-        Bucket=BUCKET,
-        Key=f"{LATEST_KEY}",
-        Body=json.dumps(row).encode(),
-        ContentType="application/json",
-    )
 
-    return {"statusCode": 200, "body": json.dumps({"ok": True})}
+def lambda_handler(
+    event: Dict[str, Any], context: Any
+) -> Dict[str, Any]:  # noqa: ANN401
+    """AWS Lambda handler – download DraftKings data and push to S3.
+
+    The *event* payload is ignored for now; all configuration is via
+    environment variables and YAML files alongside the code.
+    """
+    logger.info("Lambda invocation started – fetching DraftKings endpoints …")
+
+    try:
+        fetch_main()
+        logger.info("Fetch completed successfully.")
+        return {"status": "ok"}
+
+    except Exception as exc:  # broad catch to ensure Lambda returns JSON
+        logger.error("Fetch failed: %s", exc)
+        tb_str = "\n".join(
+            traceback.format_exception(  # type: ignore[arg-type]
+                etype=type(exc), value=exc, tb=exc.__traceback__  # type: ignore[attr-defined]
+            )
+        )
+        logger.debug(tb_str)
+        return {
+            "status": "error",
+            "error": str(exc),
+        }

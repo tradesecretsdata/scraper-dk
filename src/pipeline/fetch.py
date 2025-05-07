@@ -139,12 +139,17 @@ def main() -> None:
     if not CONFIG_PATH.exists() or not API_PATH.exists():
         sys.exit("config.yaml or dk-api.yaml missing next to fetch_dk.py")
 
+    for key, value in os.environ.items():
+        print(f"{key}={value}")
+
     # ---- S3 settings -------------------------------------------------------
     bucket_name = os.getenv("BUCKET_NAME")
     if not bucket_name:
         sys.exit("Environment variable 'BucketName' is required for S3 upload")
 
-    s3_prefix = os.getenv("S3_PREFIX", "").strip("/")  # may be empty
+    # NOTE: for some reason local build is not finding S3_PREFIX even though
+    # it is in env-dev.json
+    s3_prefix = os.getenv("S3_PREFIX", "scraper-dk").strip("/")  # may be empty
     env_name = os.getenv("Env", "dev").strip("/")
 
     def build_key(*parts: str) -> str:
@@ -208,6 +213,8 @@ def main() -> None:
                 subcat_slug,
                 f"{utc_stamp()}.json",
             )
+            print(f"S3 prefix: {s3_prefix}")
+            print(f"Key: {key}")
 
             try:
                 s3.put_object(
