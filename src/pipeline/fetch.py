@@ -139,9 +139,6 @@ def main() -> None:
     if not CONFIG_PATH.exists() or not API_PATH.exists():
         sys.exit("config.yaml or dk-api.yaml missing next to fetch_dk.py")
 
-    for key, value in os.environ.items():
-        print(f"{key}={value}")
-
     # ---- S3 settings -------------------------------------------------------
     bucket_name = os.getenv("BUCKET_NAME")
     if not bucket_name:
