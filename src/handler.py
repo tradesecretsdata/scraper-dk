@@ -80,11 +80,7 @@ def lambda_handler(
 
     except Exception as exc:  # broad catch to ensure Lambda returns JSON
         logger.error("Fetch failed: %s", exc)
-        tb_str = "\n".join(
-            traceback.format_exception(  # type: ignore[arg-type]
-                etype=type(exc), value=exc, tb=exc.__traceback__  # type: ignore[attr-defined]
-            )
-        )
+        tb_str = "".join(traceback.format_exception(exc))
         logger.debug(tb_str)
         return {
             "status": "error",
