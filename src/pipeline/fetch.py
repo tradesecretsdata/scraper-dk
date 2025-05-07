@@ -1,37 +1,53 @@
 #!/usr/bin/env python3
 """fetch_dk.py
 
-Loop through DraftKings MLB endpoints defined in ``dk-api.yaml`` and store
-the raw JSON.
+Pull DraftKings endpoints defined in ``dk-api.yaml`` and save the raw
+JSON **directly to Amazon S3** instead of a local ``data/`` folder.
 
-Project layout expected:
-
+---
+Project layout (relative to the repo root ``src/``)
+```
 src/
-├── config.yaml
-├── dk-api.yaml
-├── data/                      # auto‑created if missing
+├── config.yaml          # request settings (headers, sleep windows…)
+├── dk-api.yaml          # league → category → subCategory ID map
 └── pipeline/
-    └── fetch_dk.py            # ← this file
+    └── fetch_dk.py      # ← this script
+```
 
-Naming rules for the output path
---------------------------------
-* Every *category* and *sub‑category* name is converted to a **slug**:
-  * lower‑cased
-  * parentheses, slashes, and hyphens are removed
-  * sequences of whitespace are replaced with a single dash
-  * all other non‑alphanumeric characters are stripped
-  Example: ``"Total Runs (3-Way)" → "total-runs-3way"``
-* Each response is written to:
+S3 destination
+--------------
+The object key is built from three **environment variables** plus the
+slugified league/category/subCategory names:
 
-    data/<category‑slug>/<subcat‑slug>/<UTC‑timestamp>.json
+```
+$BucketName/$S3Prefix/$Env/raw/$league/$category/$subcategory/$timestamp.json
+```
 
-* Print statements announce requests, directory creation, saves, and the
-  sleep interval.
+* ``BucketName`` – **required** (e.g. ``my‑bucket``)
+* ``S3Prefix``  – optional (e.g. ``project‑x``); empty → no prefix
+* ``Env``       – optional (default ``dev``)
+
+Example URI:
+```
+s3://my-bucket/project-x/prod/raw/mlb/total-bases-ou/rbis-ou/20250506-160233.json
+```
+
+Print statements announce every endpoint hit, object upload, and sleep
+interval.
+
+Dependencies
+~~~~~~~~~~~~
+```bash
+pip install requests pyyaml boto3
+```
+AWS credentials must be available to ``boto3`` via the usual mechanisms
+( ``AWS_PROFILE``, environment vars, EC2/IAM role, etc.).
 """
 
 from __future__ import annotations
 
 import json
+import os
 import random
 import re
 import sys
@@ -40,18 +56,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
 
+import boto3
 import requests
 import yaml
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 # ---------------------------------------------------------------------------
-# Paths
+# Paths (script sits in src/pipeline/, so two parents up is src/)
 # ---------------------------------------------------------------------------
 
-# fetch_dk.py sits in src/pipeline/, so two parents up is src/
 BASE_DIR: Path = Path(__file__).resolve().parent.parent
-DATA_DIR: Path = BASE_DIR / "data"
 CONFIG_PATH: Path = BASE_DIR / "config.yaml"
 API_PATH: Path = BASE_DIR / "dk-api.yaml"
 
@@ -93,13 +108,6 @@ def build_session(cfg: Dict[str, Any]) -> requests.Session:
     return session
 
 
-def ensure_dir(path: Path) -> None:
-    """Create *path* (including parents) if it doesn’t already exist."""
-    if not path.exists():
-        print(f"Creating directory: {path}")
-        path.mkdir(parents=True, exist_ok=True)
-
-
 def utc_stamp() -> str:
     """Return a compact UTC timestamp suitable for filenames."""
     return datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
@@ -110,11 +118,11 @@ _remove_chars = str.maketrans("", "", "()/-")
 
 
 def slugify(name: str) -> str:
-    """Return *name* converted to the filesystem‑safe slug rules.
+    """Convert *name* to a lowercase, filesystem‑/URL‑safe slug.
 
     1. Lower‑case.
-    2. Remove parentheses, slashes, and hyphens.
-    3. Replace any run of non‑alphanumerics with a single dash.
+    2. Remove parentheses, slashes, hyphens.
+    3. Replace any run of non‑alphanumerics with a dash.
     4. Strip leading/trailing dashes.
     """
     cleaned = name.lower().translate(_remove_chars)
@@ -129,12 +137,25 @@ def slugify(name: str) -> str:
 
 def main() -> None:
     if not CONFIG_PATH.exists() or not API_PATH.exists():
-        sys.exit("config.yaml or dk-api.yaml missing next to data/ directory")
+        sys.exit("config.yaml or dk-api.yaml missing next to fetch_dk.py")
 
+    # ---- S3 settings -------------------------------------------------------
+    bucket_name = os.getenv("BUCKET_NAME")
+    if not bucket_name:
+        sys.exit("Environment variable 'BucketName' is required for S3 upload")
+
+    s3_prefix = os.getenv("S3_PREFIX", "").strip("/")  # may be empty
+    env_name = os.getenv("Env", "dev").strip("/")
+
+    def build_key(*parts: str) -> str:
+        """Join parts with '/' while skipping empties."""
+        return "/".join(p.strip("/") for p in (s3_prefix, env_name, *parts) if p)
+
+    s3 = boto3.client("s3")
+
+    # ---- HTTP settings -----------------------------------------------------
     cfg = load_yaml(CONFIG_PATH)["requests"]
     api_map = load_yaml(API_PATH)
-
-    ensure_dir(DATA_DIR)
 
     base_url: str = cfg["baseUrl"].rstrip("/")
     sleep_min: float = cfg.get("sleepSecondsMin", 3)
@@ -142,7 +163,9 @@ def main() -> None:
 
     session = build_session(cfg)
 
-    sport_cfg = api_map["mlb"]
+    # Only MLB is defined for now; extend easily for others
+    league_name = "mlb"
+    sport_cfg = api_map[league_name]
     event_group_id = sport_cfg["eventGroupId"]
 
     for category_name, cat_data in sport_cfg["categories"].items():
@@ -155,7 +178,7 @@ def main() -> None:
         )
 
         for subcat_name, subcat_data in cat_data[subcats_key].items():
-            # value may be an int or a mapping containing the id
+            # subcat_data may be int or mapping containing the id
             if isinstance(subcat_data, dict):
                 subcat_id = subcat_data.get("subCategoryId") or subcat_data.get(
                     "subcategoryId"
@@ -178,13 +201,25 @@ def main() -> None:
                 print(f"   ! Request failed: {exc}")
                 continue
 
-            dest_dir = DATA_DIR / cat_slug / subcat_slug
-            ensure_dir(dest_dir)
+            key = build_key(
+                "raw",
+                league_name,
+                cat_slug,
+                subcat_slug,
+                f"{utc_stamp()}.json",
+            )
 
-            file_path = dest_dir / f"{utc_stamp()}.json"
-            with file_path.open("w", encoding="utf-8") as fh:
-                json.dump(resp.json(), fh)
-            print(f"   ✔ Saved to {file_path}")
+            try:
+                s3.put_object(
+                    Bucket=bucket_name,
+                    Key=key,
+                    Body=json.dumps(resp.json()).encode("utf-8"),
+                    ContentType="application/json",
+                )
+                print(f"   ✔ Uploaded to s3://{bucket_name}/{key}")
+            except Exception as exc:  # broad except OK for top‑level logging
+                print(f"   ! S3 upload failed: {exc}")
+                continue
 
             delay = random.uniform(sleep_min, sleep_max)
             print(f"   ⏸ Sleeping {delay:.1f}s...")
