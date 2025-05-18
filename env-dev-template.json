@@ -5,6 +5,11 @@
     "PROC_PREFIX": "scraper-dk/dev/processed",
     "DB_URI": "s3://my-bucket/s3-prefix/dev/db/data.duckdb",
     "AWS_REGION": "us-east-2",
-    "S3_PREFIX": "s3-prefix"
+    "S3_PREFIX": "s3-prefix",
+    "OXYLABS_USER": "",
+    "OXYLABS_PASSWORD": "",
+    "OXYLABS_PORT": "",
+    "OXYLABS_HOST": "",
+    "OXYLABS_COUNTRY": ""
   }
 }

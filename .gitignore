@@ -12,3 +12,6 @@ src/data/*
 .env
 samconfig.local.toml
 *.pem
+*.crt
+playground/
+oxylabs.json

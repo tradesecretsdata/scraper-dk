@@ -4,6 +4,9 @@
 Pull DraftKings endpoints defined in ``dk-api.yaml`` and save the raw
 JSON **directly to Amazon S3** instead of a local ``data/`` folder.
 
+Now supports routing every HTTP request through an **Oxylabs residential
+proxy** when the ``OXYLABS_*`` environment variables are present.
+
 ---
 Project layout (relative to the repo root ``src/``)
 ```
@@ -82,10 +85,35 @@ def load_yaml(path: Path) -> Dict[str, Any]:
 
 
 def build_session(cfg: Dict[str, Any]) -> requests.Session:
-    """Return a Requests session pre‑configured with headers, retry & timeout."""
+    """Return a Requests session pre‑configured with headers, retry, timeout,
+    and **optionally** an Oxylabs proxy. If the four ``OXYLABS_*`` environment
+    variables (host, port, user, password) are present, all requests are
+    routed through the residential gateway using the country code specified in
+    ``OXYLABS_COUNTRY`` (defaults to ``US``).
+    """
+
     session = requests.Session()
     session.headers.update(cfg["headers"])
 
+    # -- Optional Oxylabs proxy -------------------------------------------
+    proxy_host = os.getenv("OXYLABS_HOST")
+    proxy_port = os.getenv("OXYLABS_PORT")
+    proxy_user = os.getenv("OXYLABS_USER")
+    proxy_password = os.getenv("OXYLABS_PASSWORD")
+    proxy_cc = os.getenv("OXYLABS_COUNTRY", "US")
+
+    if all((proxy_host, proxy_port, proxy_user, proxy_password)):
+        proxy_entry = (
+            f"http://customer-{proxy_user}-cc-{proxy_cc}:"
+            f"{proxy_password}@{proxy_host}:{proxy_port}"
+        )
+        print(f"Proxy entry: {proxy_entry}")
+        session.proxies.update({"http": proxy_entry, "https": proxy_entry})
+        print("[fetch] Oxylabs proxy enabled →", proxy_entry.split("@")[-1])
+    else:
+        print("[fetch] Oxylabs proxy **not** configured – going direct")
+
+    # -- Retry & timeout ----------------------------------------------------
     retries = Retry(
         total=cfg.get("retriesMax", 3),
         backoff_factor=1,
@@ -144,8 +172,6 @@ def main() -> None:
     if not bucket_name:
         sys.exit("Environment variable 'BucketName' is required for S3 upload")
 
-    # NOTE: for some reason local build is not finding S3_PREFIX even though
-    # it is in env-dev.json
     s3_prefix = os.getenv("S3_PREFIX", "scraper-dk").strip("/")  # may be empty
     env_name = os.getenv("Env", "dev").strip("/")
 
