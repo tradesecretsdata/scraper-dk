@@ -1,6 +1,7 @@
 {
   "ScraperFunction": {
     "BUCKET_NAME": "my-bucket",
+    "ENV": "my-env",
     "RAW_PREFIX": "s3-prefix/dev/raw",
     "PROC_PREFIX": "scraper-dk/dev/processed",
     "DB_URI": "s3://my-bucket/s3-prefix/dev/db/data.duckdb",

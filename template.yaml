@@ -38,6 +38,7 @@ Globals:
         DB_URI: !Sub "s3://${BucketName}/${S3Prefix}/${Env}/db/scraper-dk.duckdb"
         API_URL: !Ref ApiUrl
         BUCKET_NAME: !Ref BucketName
+        S3_PREFIX: !Ref S3Prefix
         OXYLABS_HOST: !Sub
           - "{{resolve:secretsmanager:${SecretName}:SecretString:host}}"
           - { SecretName: !FindInMap [SecretNames, !Ref Env, Oxylabs] }

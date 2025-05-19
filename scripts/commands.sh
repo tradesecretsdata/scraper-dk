@@ -42,7 +42,10 @@ aws cloudformation deploy \
 sam build --use-container
 
 # Local invoke
-sam local invoke
+sam local invoke ScraperFunction -n env-dev.json
+
+# Stage invoke
+sam remote invoke ScraperFunction --config-env stage --stack-name pipeline-stage
 
 # Deploy
 ## Stage
@@ -107,4 +110,13 @@ aws s3 rm s3://$BUCKET_NAME/$S3_PREFIX/$ENV/raw   --recursive
 aws s3 rm s3://$BUCKET_NAME/$S3_PREFIX/$ENV/processed --recursive
 aws s3 rm s3://$BUCKET_NAME/$S3_PREFIX/$ENV/db/scraper-dk.duckdb
 
+########################################
+# Oxylabs secret deployment
+########################################
+aws secretsmanager create-secret \
+  --name /scraper-dk/staging/oxylabs \
+  --secret-string file://oxylabs.json
 
+aws secretsmanager create-secret \
+  --name /scraper-dk/prod/oxylabs \
+  --secret-string file://oxylabs.json

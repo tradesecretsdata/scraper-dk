@@ -17,7 +17,6 @@ parameter_overrides = "Env=\"stage\" BucketName=\"tradesecretsdata\" S3Prefix=\"
 image_repositories = []
 
 # Prod (CI/CD uses this)
-resolve_s3 = true
 [prod.deploy.parameters]
 stack_name = "pipeline-prod"
 s3_bucket = "tradesecretsdata"
