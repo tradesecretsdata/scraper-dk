@@ -60,6 +60,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 import boto3
+import botocore.exceptions
 import requests
 import yaml
 from requests.adapters import HTTPAdapter
@@ -222,12 +223,14 @@ def main() -> None:
             )
             print(f"--> GET {url}")
 
+            # Delay after each request; randomize length of time for each request
+            delay = random.uniform(sleep_min, sleep_max)
+
             try:
                 resp = session.get(url)
                 resp.raise_for_status()
             except requests.RequestException as exc:
                 print(f"   ! Request failed: {exc}")
-                delay = random.uniform(sleep_min, sleep_max)
                 print(f"   ⏸ Sleeping {delay:.1f}s...")
                 time.sleep(delay)
                 continue
@@ -249,16 +252,18 @@ def main() -> None:
                     ContentType="application/json",
                 )
                 print(f"   ✔ Uploaded to s3://{bucket_name}/{key}")
+            except botocore.exceptions.ClientError as err:
+                if err.response["Error"]["Code"] == "AccessDenied":
+                    print(
+                        f"⚠️  S3 upload blocked ­— no PutObject permission on {bucket_name}/{key}"
+                    )
+                    # TODO: Optional: retry with a different key, queue a DLQ message, etc.
             except Exception as exc:  # broad except OK for top‑level logging
                 print(f"   ! S3 upload failed: {exc}")
-                delay = random.uniform(sleep_min, sleep_max)
+            finally:
                 print(f"   ⏸ Sleeping {delay:.1f}s...")
                 time.sleep(delay)
                 continue
-
-            delay = random.uniform(sleep_min, sleep_max)
-            print(f"   ⏸ Sleeping {delay:.1f}s...")
-            time.sleep(delay)
 
 
 if __name__ == "__main__":
