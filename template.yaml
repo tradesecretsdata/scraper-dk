@@ -16,6 +16,13 @@ Parameters:
     Type: String
     Default: ""
 
+Mappings:
+  SecretNames:
+    stage:
+      Oxylabs: /scraper-dk/stage/oxylabs
+    prod:
+      Oxylabs: /scraper-dk/prod/oxylabs
+
 Globals:
   Function:
     Runtime: python3.12
@@ -25,26 +32,55 @@ Globals:
     Handler: handler.lambda_handler
     Environment:
       Variables:
+        ENV: !Ref Env
         RAW_PREFIX: !Sub "${S3Prefix}/${Env}/raw"
         PROC_PREFIX: !Sub "${S3Prefix}/${Env}/processed"
         DB_URI: !Sub "s3://${BucketName}/${S3Prefix}/${Env}/db/scraper-dk.duckdb"
         API_URL: !Ref ApiUrl
         BUCKET_NAME: !Ref BucketName
+        OXYLABS_HOST: !Sub
+          - "{{resolve:secretsmanager:${SecretName}:SecretString:host}}"
+          - { SecretName: !FindInMap [SecretNames, !Ref Env, Oxylabs] }
+
+        OXYLABS_PORT: !Sub
+          - "{{resolve:secretsmanager:${SecretName}:SecretString:port}}"
+          - { SecretName: !FindInMap [SecretNames, !Ref Env, Oxylabs] }
+
+        OXYLABS_USER: !Sub
+          - "{{resolve:secretsmanager:${SecretName}:SecretString:user}}"
+          - { SecretName: !FindInMap [SecretNames, !Ref Env, Oxylabs] }
+
+        OXYLABS_PASSWORD: !Sub
+          - "{{resolve:secretsmanager:${SecretName}:SecretString:password}}"
+          - { SecretName: !FindInMap [SecretNames, !Ref Env, Oxylabs] }
+
+        OXYLABS_COUNTRY: !Sub
+          - "{{resolve:secretsmanager:${SecretName}:SecretString:country}}"
+          - { SecretName: !FindInMap [SecretNames, !Ref Env, Oxylabs] }
 
 Resources:
   ScraperFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: src/
+      Policies:
+        # 1. Read *only* the Oxylabs secret for the chosen environment
+        - SecretsManagerGetSecretValuePolicy:
+            SecretArn: !Sub
+              - arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${SecretName}*
+              - { SecretName: !FindInMap [SecretNames, !Ref Env, Oxylabs] }
+        # 2. Write DraftKings JSON to the specified S3 bucket/prefix
+        - S3WritePolicy:
+            BucketName: !Ref BucketName
       Role: !Ref RoleArn
       Events:
-        FiveMinuteSchedule:
+        HourlySchedule:
           Type: Schedule
           Properties:
             Schedule: !If
               - IsProd
-              - "rate(5 minutes)"
-              - "rate(30 minutes)"
+              - "rate(60 minutes)"
+              - "rate(120 minutes)"
       Layers: [] # add libs layer if size > 250 MB
 
   # OPTIONAL: CloudWatch metric + alarm straight in CFN
@@ -72,3 +108,5 @@ Conditions:
 Outputs:
   FunctionArn: { Value: !GetAtt ScraperFunction.Arn }
   BucketName: { Value: !Ref BucketName }
+  OxySecretName:
+    Value: !FindInMap [SecretNames, !Ref Env, Oxylabs]

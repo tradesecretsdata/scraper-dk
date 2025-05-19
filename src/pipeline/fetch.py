@@ -172,8 +172,8 @@ def main() -> None:
     if not bucket_name:
         sys.exit("Environment variable 'BucketName' is required for S3 upload")
 
-    s3_prefix = os.getenv("S3_PREFIX", "scraper-dk").strip("/")  # may be empty
-    env_name = os.getenv("Env", "dev").strip("/")
+    s3_prefix = os.getenv("S3_PREFIX").strip("/")
+    env_name = os.getenv("ENV").strip("/")
 
     def build_key(*parts: str) -> str:
         """Join parts with '/' while skipping empties."""
@@ -239,7 +239,6 @@ def main() -> None:
                 subcat_slug,
                 f"{utc_stamp()}.json",
             )
-            print(f"S3 prefix: {s3_prefix}")
             print(f"Key: {key}")
 
             try:

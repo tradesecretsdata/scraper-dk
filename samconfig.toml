@@ -8,7 +8,7 @@ use_container = false
 [stage.deploy.parameters]
 stack_name = "pipeline-stage"
 s3_bucket = "tradesecretsdata"
-s3_prefix = "scraper-dk/stage/sam-artifacts"
+s3_prefix = "pipeline-stage"
 region = "us-east-2"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
@@ -17,6 +17,7 @@ parameter_overrides = "Env=\"stage\" BucketName=\"tradesecretsdata\" S3Prefix=\"
 image_repositories = []
 
 # Prod (CI/CD uses this)
+resolve_s3 = true
 [prod.deploy.parameters]
 stack_name = "pipeline-prod"
 s3_bucket = "tradesecretsdata"
