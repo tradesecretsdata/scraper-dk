@@ -227,6 +227,9 @@ def main() -> None:
                 resp.raise_for_status()
             except requests.RequestException as exc:
                 print(f"   ! Request failed: {exc}")
+                delay = random.uniform(sleep_min, sleep_max)
+                print(f"   ⏸ Sleeping {delay:.1f}s...")
+                time.sleep(delay)
                 continue
 
             key = build_key(
@@ -249,6 +252,9 @@ def main() -> None:
                 print(f"   ✔ Uploaded to s3://{bucket_name}/{key}")
             except Exception as exc:  # broad except OK for top‑level logging
                 print(f"   ! S3 upload failed: {exc}")
+                delay = random.uniform(sleep_min, sleep_max)
+                print(f"   ⏸ Sleeping {delay:.1f}s...")
+                time.sleep(delay)
                 continue
 
             delay = random.uniform(sleep_min, sleep_max)
