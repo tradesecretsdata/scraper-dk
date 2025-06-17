@@ -13,4 +13,19 @@ requests:
   sleepSecondsMax: 10
   retriesMax: 10
   timeout: 10
-proxies:
+stat_types:
+  poisson:
+    - rbis
+    - runs
+    - hits
+    - walks
+    - strikeouts
+    - home_runs
+    - singles
+    - doubles
+    - triples
+    - stolen
+    - outs_recorded
+    - earned_runs_allowed
+    - hits_allowed
+  gamma:

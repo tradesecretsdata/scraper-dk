@@ -4,20 +4,19 @@ from io import StringIO
 
 
 def _fake_fetch():
-    """Return a minimal Over/Under pair."""
     return {
-        "hits/total": {
+        "pitcher_props/triples_ou": {
             "selections": [
                 {
                     "label": "Over",
                     "participants": [{"name": "Jane"}],
-                    "points": 1.5,
+                    "points": 0.5,
                     "displayOdds": {"american": "-110", "decimal": 1.91},
                 },
                 {
                     "label": "Under",
                     "participants": [{"name": "Jane"}],
-                    "points": 1.5,
+                    "points": 0.5,
                     "displayOdds": {"american": "-110", "decimal": 1.91},
                 },
             ]
@@ -67,4 +66,4 @@ def test_lambda_handler(monkeypatch):
     rows = list(reader)
     assert len(rows) == 1
     assert rows[0]["player"] == "Jane"
-    assert rows[0]["subcategory"] == "doubles"
+    assert rows[0]["subcategory"] == "triples_ou"

@@ -1,12 +1,8 @@
-"""Transform DraftKings API payloads into merged Over/Under rows.
-
-Now returns a **subcategory** column in addition to category.
-No pandas / numpy required.
-"""
+"""Transform DraftKings API payloads into merged Over/Under rows
+with proper *category* and *subcategory* names (no pandas needed)."""
 
 from __future__ import annotations
 
-import re
 from typing import Any, Dict, List, Tuple
 
 
@@ -35,13 +31,11 @@ def _vig_free_decimal(p_over: float, p_under: float) -> Tuple[float, float]:
 
 def parse_main(payloads: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    Convert raw DraftKings payloads into a list of dict rows.
+    Convert raw endpoint payloads to list-of-dict rows containing:
 
-    Each row contains:
-      • category      -> “game”, “batter”, or “pitcher”
-      • subcategory   -> e.g. “doubles”, “walks allowed”
-      • merged Over / Under lines
-      • vig-free decimal & American odds
+    category     → top-level slug (e.g. ``pitcher_props``)
+    subcategory  → readable slug with spaces (e.g. ``walks allowed ou``)
+    plus merged Over / Under odds and their vig-free equivalents.
     """
     rows: list[dict[str, Any]] = []
 
@@ -51,14 +45,11 @@ def parse_main(payloads: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
 
         try:
             category_slug, subcat_slug = ep_key.split("/", 1)
-        except ValueError:  # malformed key
-            continue
+        except ValueError:
+            continue  # malformed key
 
-        # category remains the slug (game / batter / pitcher)
-        category = category_slug
-
-        # subcategory – nice readable form, lower-case with spaces
-        subcategory = re.sub(r"[_\-]+", " ", subcat_slug).lower()
+        category = category_slug  # already slug form
+        subcategory = subcat_slug
 
         groups: dict[Tuple[str, float | None], dict[str, Any]] = {}
 

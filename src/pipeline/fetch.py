@@ -11,6 +11,7 @@ import os
 import random
 import sys
 import time
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Mapping
@@ -37,14 +38,17 @@ def _load_yaml(path: Path) -> Dict[str, Any]:
 
 
 def _slugify(s: str) -> str:
-    return (
-        s.lower()
-        .replace("&", "and")
-        .replace("'", "")
-        .replace("/", " ")
-        .replace("-", " ")
-        .split()[0]
-    )
+    s = s.lower()
+    s = s.replace("&", "and").replace("'", "")
+    # collapse O/U abbreviation
+    s = re.sub(r"\bo\s*/\s*u\b", "ou", s, flags=re.I)
+    # replace separators with space
+    s = re.sub(r"[\/\-]", " ", s)
+    # collapse whitespace, then underscore-join
+    s = re.sub(r"\s+", " ", s).strip().replace(" ", "_")
+    # strip any stray chars
+    s = re.sub(r"[^a-z0-9_]", "", s)
+    return s
 
 
 def _build_session(cfg: Mapping[str, Any]) -> requests.Session:

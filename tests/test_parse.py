@@ -1,12 +1,10 @@
 import pytest
-
 from pipeline import parse as parse_mod
 
 
 def test_parse_main():
-    """Row has correct category & NEW subcategory column."""
     responses = {
-        "batter/doubles": {
+        "pitcher_props/triples_ou": {
             "selections": [
                 {
                     "label": "Over",
@@ -25,14 +23,11 @@ def test_parse_main():
     }
 
     rows = parse_mod.parse_main(responses)
-
     assert len(rows) == 1
     row = rows[0]
 
-    assert row["category"] == "batter"
-    assert row["subcategory"] == "doubles"
+    assert row["category"] == "pitcher_props"
+    assert row["subcategory"] == "triples_ou"
     assert row["player"] == "John"
-
-    # vig-free should be +100 / 2.0 when both sides −110
     assert pytest.approx(row["vig_free_over_decimal_odds"], rel=1e-3) == 2.0
     assert row["vig_free_over_american_odds"] == 100

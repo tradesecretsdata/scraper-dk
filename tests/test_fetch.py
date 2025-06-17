@@ -76,5 +76,5 @@ def test_fetch_main(monkeypatch):
     result = fetch_mod.fetch_main()
 
     # Expect exactly one key → 'hits/total'
-    assert list(result) == ["hits/total"]
-    assert result["hits/total"] == dummy_payload
+    assert list(result) == ["hits/total_bases"]
+    assert result["hits/total_bases"] == dummy_payload
