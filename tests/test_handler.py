@@ -65,4 +65,6 @@ def test_lambda_handler(monkeypatch):
     buf = StringIO(csv_bodies[0])
     reader = csv.DictReader(buf)
     rows = list(reader)
-    assert len(rows) == 1 and rows[0]["player"] == "Jane"
+    assert len(rows) == 1
+    assert rows[0]["player"] == "Jane"
+    assert rows[0]["subcategory"] == "doubles"

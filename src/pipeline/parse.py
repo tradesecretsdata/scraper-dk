@@ -1,6 +1,7 @@
 """Transform DraftKings API payloads into merged Over/Under rows.
 
-Returns **a list of dicts**; no external deps.
+Now returns a **subcategory** column in addition to category.
+No pandas / numpy required.
 """
 
 from __future__ import annotations
@@ -33,15 +34,31 @@ def _vig_free_decimal(p_over: float, p_under: float) -> Tuple[float, float]:
 
 
 def parse_main(payloads: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Return list-of-dict rows with vig-free decimal & American odds."""
+    """
+    Convert raw DraftKings payloads into a list of dict rows.
+
+    Each row contains:
+      • category      -> “game”, “batter”, or “pitcher”
+      • subcategory   -> e.g. “doubles”, “walks allowed”
+      • merged Over / Under lines
+      • vig-free decimal & American odds
+    """
     rows: list[dict[str, Any]] = []
 
     for ep_key, payload in payloads.items():
         if "selections" not in payload:
             continue
 
-        category_slug = ep_key.split("/")[0]
-        category = re.sub(r"[_\-]+", " ", category_slug).title()
+        try:
+            category_slug, subcat_slug = ep_key.split("/", 1)
+        except ValueError:  # malformed key
+            continue
+
+        # category remains the slug (game / batter / pitcher)
+        category = category_slug
+
+        # subcategory – nice readable form, lower-case with spaces
+        subcategory = re.sub(r"[_\-]+", " ", subcat_slug).lower()
 
         groups: dict[Tuple[str, float | None], dict[str, Any]] = {}
 
@@ -63,7 +80,7 @@ def parse_main(payloads: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
 
         for (player, points), g in groups.items():
             if "over" not in g or "under" not in g:
-                continue  # incomplete pair
+                continue
 
             over_dec = g["over"]["decimal"]
             under_dec = g["under"]["decimal"]
@@ -74,6 +91,7 @@ def parse_main(payloads: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
             rows.append(
                 {
                     "category": category,
+                    "subcategory": subcategory,
                     "player": player,
                     "points": points,
                     #
