@@ -1,88 +1,74 @@
-"""AWS Lambda entry‑point for the DraftKings fetch job.
-
-The function simply delegates to ``pipeline.fetch.main`` which:
-  • builds the endpoints defined in ``dk-api.yaml``
-  • downloads each JSON payload
-  • uploads the raw data to S3 at the key pattern documented there
-
-Project layout (relative to the repo root ``src/``)::
-
-    src/
-    ├── config.yaml
-    ├── dk-api.yaml
-    ├── handler.py          # ← this file (Lambda handler)
-    └── pipeline/
-        └── fetch.py
-
-Environment variables required (same as ``fetch.py``):
-    BucketName  – S3 bucket to write into (required)
-    S3Prefix    – optional path prefix (no leading /)
-    Env         – environment name (e.g. dev / prod); default "dev"
-
-Deploy notes
-------------
-* Package all files under ``src/`` plus third‑party dependencies
-  (``requests``, ``boto3``, ``PyYAML``) into the Lambda layer or zip.
-* Set the Lambda handler to ``handler.lambda_handler``.
-"""
+"""AWS Lambda handler – pandas-free implementation."""
 
 from __future__ import annotations
 
+import csv
+import io
 import logging
+import os
 import traceback
-from typing import Any, Dict
+from datetime import datetime, timezone
+from typing import Any, Dict, List
 
-# ---------------------------------------------------------------------------
-# Configure root logging – CloudWatch will capture stdout/stderr automatically
-# ---------------------------------------------------------------------------
-logging.basicConfig(
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    level=logging.INFO,
-    force=True,  # override any previous config
-)
+from pipeline.fetch import fetch_main
+from pipeline.parse import parse_main
+from utils.s3_utils import build_key, upload_csv, upload_json
+
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+
+def _utc_stamp() -> str:
+    return datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
+def _rows_to_csv(rows: List[Dict[str, Any]]) -> str:
+    """Convert list-of-dicts -> CSV string."""
+    if not rows:
+        return ""
+
+    header = list(rows[0])
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=header, extrasaction="ignore")
+    writer.writeheader()
+    writer.writerows(rows)
+    return buf.getvalue()
 
 
 # ---------------------------------------------------------------------------
-# Attempt to import the fetch routine
-# ---------------------------------------------------------------------------
-try:
-    # Normal import when ``pipeline`` is importable as a namespace package.
-    from pipeline.fetch import main as fetch_main  # type: ignore
-except ModuleNotFoundError:
-    # Fallback: add ``src/pipeline`` to sys.path and import the module directly.
-    import sys
-    from pathlib import Path
-
-    pipeline_path = Path(__file__).resolve().parent / "pipeline"
-    sys.path.append(str(pipeline_path))
-    try:
-        from fetch import main as fetch_main  # type: ignore  # noqa: E401
-    except ModuleNotFoundError as exc:  # pragma: no cover – irrecoverable
-        logger.error("Failed to import fetch.py: %s", exc)
-        raise
 
 
 def lambda_handler(
     event: Dict[str, Any], context: Any
 ) -> Dict[str, Any]:  # noqa: ANN401
-    """AWS Lambda handler – download DraftKings data and push to S3.
-
-    The *event* payload is ignored for now; all configuration is via
-    environment variables and YAML files alongside the code.
-    """
-    logger.info("Lambda invocation started – fetching DraftKings endpoints …")
-
     try:
-        fetch_main()
-        logger.info("Fetch completed successfully.")
-        return {"status": "ok"}
+        raw_payloads = fetch_main()  # <-- no S3 side-effects
+        logger.info("Fetched %d raw endpoint payloads", len(raw_payloads))
 
-    except Exception as exc:  # broad catch to ensure Lambda returns JSON
-        logger.error("Fetch failed: %s", exc)
-        tb_str = "".join(traceback.format_exception(exc))
-        logger.debug(tb_str)
-        return {
-            "status": "error",
-            "error": str(exc),
-        }
+        # -- upload raw -----------------------------------------------------
+        bucket = os.getenv("BUCKET_NAME") or os.getenv("BucketName")
+        prefix_raw = os.getenv("S3_PREFIX", "raw").strip("/")
+        env_name = os.getenv("ENV", "dev").strip("/")
+
+        ts = _utc_stamp()
+        for ep_key, payload in raw_payloads.items():
+            key = build_key(prefix_raw, env_name, "raw", ep_key, f"{ts}.json")
+            upload_json(payload, key, bucket=bucket)
+
+        # -- parse ----------------------------------------------------------
+        rows = parse_main(raw_payloads)
+        logger.info("Parsed %d Over/Under rows", len(rows))
+
+        # -- upload processed CSV ------------------------------------------
+        csv_content = _rows_to_csv(rows)
+        proc_prefix = os.getenv("PROC_PREFIX", "processed").strip("/")
+        proc_key = build_key(proc_prefix, f"{ts}.csv")
+        upload_csv(csv_content, proc_key, bucket=bucket)
+
+        logger.info("🎉 Pipeline complete")
+        return {"status": "ok", "rows": len(rows)}
+
+    except Exception as exc:
+        logger.error("❌ Pipeline failed – %s", exc)
+        logger.debug("Traceback:\n%s", "".join(traceback.format_exception(exc)))
+        return {"status": "error", "error": str(exc)}
