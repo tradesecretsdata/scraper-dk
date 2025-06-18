@@ -1,4 +1,15 @@
-"""AWS Lambda handler – pandas-free implementation."""
+"""AWS Lambda entry point – now uploads TWO processed CSVs.
+
+  • {PROC_PREFIX}/bets/{timestamp}.csv     – detailed, one row per bet
+  • {PROC_PREFIX}/players/{timestamp}.csv  – one row per player (pivot)
+
+Environment vars
+----------------
+BUCKET_NAME   – destination S3 bucket
+S3_PREFIX     – prefix for raw JSON uploads  (default 'raw')
+PROC_PREFIX   – prefix for processed outputs (default 'processed')
+ENV           – env name used inside the raw prefix (default 'dev')
+"""
 
 from __future__ import annotations
 
@@ -11,11 +22,17 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from pipeline.fetch import fetch_main
-from pipeline.parse import parse_main
+from pipeline.parse import parse_and_pivot  # ← returns bets, players
 from utils.s3_utils import build_key, upload_csv, upload_json
 
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
+)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 
 def _utc_stamp() -> str:
@@ -23,10 +40,9 @@ def _utc_stamp() -> str:
 
 
 def _rows_to_csv(rows: List[Dict[str, Any]]) -> str:
-    """Convert list-of-dicts -> CSV string."""
+    """Convert list-of-dict rows → CSV string."""
     if not rows:
         return ""
-
     header = list(rows[0])
     buf = io.StringIO()
     writer = csv.DictWriter(buf, fieldnames=header, extrasaction="ignore")
@@ -36,37 +52,49 @@ def _rows_to_csv(rows: List[Dict[str, Any]]) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Lambda handler
+# ---------------------------------------------------------------------------
 
 
 def lambda_handler(
     event: Dict[str, Any], context: Any
 ) -> Dict[str, Any]:  # noqa: ANN401
     try:
-        raw_payloads = fetch_main()  # <-- no S3 side-effects
-        logger.info("Fetched %d raw endpoint payloads", len(raw_payloads))
-
-        # -- upload raw -----------------------------------------------------
         bucket = os.getenv("BUCKET_NAME") or os.getenv("BucketName")
-        prefix_raw = os.getenv("S3_PREFIX", "raw").strip("/")
+        raw_prefix = os.getenv("S3_PREFIX", "raw").strip("/")
+        proc_prefix = os.getenv("PROC_PREFIX", "processed").strip("/")
         env_name = os.getenv("ENV", "dev").strip("/")
 
-        ts = _utc_stamp()
+        timestamp = _utc_stamp()
+
+        # 1) Fetch DraftKings endpoints
+        raw_payloads = fetch_main()
+        logger.info("Fetched %d endpoint payloads", len(raw_payloads))
+
+        # 2) Upload RAW JSONs
         for ep_key, payload in raw_payloads.items():
-            key = build_key(prefix_raw, env_name, "raw", ep_key, f"{ts}.json")
+            key = build_key(raw_prefix, env_name, "raw", ep_key, f"{timestamp}.json")
             upload_json(payload, key, bucket=bucket)
 
-        # -- parse ----------------------------------------------------------
-        rows = parse_main(raw_payloads)
-        logger.info("Parsed %d Over/Under rows", len(rows))
+        # 3) Parse → two tables
+        bet_rows, player_rows = parse_and_pivot(raw_payloads)
+        logger.info("Parsed bets=%d  players=%d", len(bet_rows), len(player_rows))
 
-        # -- upload processed CSV ------------------------------------------
-        csv_content = _rows_to_csv(rows)
-        proc_prefix = os.getenv("PROC_PREFIX", "processed").strip("/")
-        proc_key = build_key(proc_prefix, f"{ts}.csv")
-        upload_csv(csv_content, proc_key, bucket=bucket)
+        # 4) Upload processed CSVs
+        bets_key = build_key(proc_prefix, "bets", f"{timestamp}.csv")
+        players_key = build_key(proc_prefix, "players", f"{timestamp}.csv")
 
-        logger.info("🎉 Pipeline complete")
-        return {"status": "ok", "rows": len(rows)}
+        upload_csv(_rows_to_csv(bet_rows), bets_key, bucket=bucket)
+        upload_csv(_rows_to_csv(player_rows), players_key, bucket=bucket)
+
+        logger.info("🎉 Uploaded bets → %s  and players → %s", bets_key, players_key)
+
+        # Return counts for monitoring
+        return {
+            "status": "ok",
+            "bets_rows": len(bet_rows),
+            "players_rows": len(player_rows),
+        }
 
     except Exception as exc:
         logger.error("❌ Pipeline failed – %s", exc)

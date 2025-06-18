@@ -1,19 +1,22 @@
 """
-Parse DraftKings JSON payloads into merged Over/Under rows.
+Parse DraftKings payloads and pivot into a player table with complete columns.
 
-Adds a `poisson_mean` column – the λ that reproduces the vig-free
-probability of going *over* the betting line, assuming a Poisson model.
-No pandas / numpy required.
+Exports
+-------
+parse_main(payloads)     -> list[dict]   # detailed bet rows
+pivot_players(rows)      -> list[dict]   # one row per player, all subcats
+parse_and_pivot(...)     -> (rows, pivot_rows)
 """
 
 from __future__ import annotations
 
 import math
+from collections import defaultdict
 from typing import Any, Dict, List, Tuple
 
 
 # ──────────────────────────────
-# Basic conversions / utilities
+# Conversions / math utilities
 # ──────────────────────────────
 def _normalize_american(val) -> int | None:
     if val is None:
@@ -47,9 +50,8 @@ def _vig_free_decimal(p_over: float, p_under: float) -> Tuple[float, float]:
 #   Poisson helpers
 # ──────────────────────────────
 def _poisson_cdf(lam: float, k: int) -> float:
-    """Return P(X ≤ k) for X~Poisson(λ) via direct summation."""
     term = math.exp(-lam)
-    cumulative = term  # P(X=0)
+    cumulative = term
     for i in range(1, k + 1):
         term *= lam / i
         cumulative += term
@@ -57,47 +59,24 @@ def _poisson_cdf(lam: float, k: int) -> float:
 
 
 def _solve_lambda(k: int, p_over: float, tol: float = 1e-6) -> float:
-    """
-    Find λ such that P(X > k) = p_over.
-
-    Because the Poisson CDF is **monotonically decreasing** in λ
-    for any fixed k, we binary-search on that property.
-
-    Parameters
-    ----------
-    k        floor(points)
-    p_over   vig-free probability of going over the line
-    """
-    target_cdf = 1.0 - p_over
-    lo, hi = 0.0, 100.0  # 100 is safely above any realistic MLB prop mean
-
-    for _ in range(60):  # enough for ~1e-18 precision
+    target = 1.0 - p_over
+    lo, hi = 0.0, 100.0
+    for _ in range(60):
         mid = (lo + hi) / 2
         cdf_mid = _poisson_cdf(mid, k)
-
-        if abs(cdf_mid - target_cdf) < tol:
+        if abs(cdf_mid - target) < tol:
             return mid
-
-        # CDF decreases with λ:
-        #  • if cdf_mid < target  → λ too HIGH → move upper bound down
-        #  • if cdf_mid > target  → λ too LOW  → move lower bound up
-        if cdf_mid < target_cdf:
+        if cdf_mid < target:  # λ too high → move hi down
             hi = mid
-        else:
+        else:  # λ too low  → move lo up
             lo = mid
-
     return (lo + hi) / 2.0
 
 
 # ──────────────────────────────
-#           Public API
+# 1) Detailed row-level parser
 # ──────────────────────────────
 def parse_main(payloads: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """
-    Convert raw endpoint payloads to list-of-dict rows.
-
-    Keeps only Over/Under markets that have both sides.
-    """
     rows: list[dict[str, Any]] = []
 
     for ep_key, payload in payloads.items():
@@ -107,9 +86,9 @@ def parse_main(payloads: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
         try:
             category_slug, subcat_slug = ep_key.split("/", 1)
         except ValueError:
-            continue  # malformed key
+            continue
 
-        category = category_slug
+        category = category_slug  # e.g. pitcher_props
         subcategory = subcat_slug
 
         groups: dict[Tuple[str, float | None], dict[str, Any]] = {}
@@ -142,7 +121,6 @@ def parse_main(payloads: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
             vf_over_amer = _decimal_to_american(vf_over_dec)
             vf_under_amer = _decimal_to_american(vf_under_dec)
 
-            # --- Poisson mean ---------------------------------------------
             p_over_vf = _american_to_prob(vf_over_amer)
             k_floor = int(math.floor(points)) if points is not None else 0
             poisson_mean = (
@@ -174,28 +152,93 @@ def parse_main(payloads: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 # ──────────────────────────────
-# Tiny demo
+# 2) Player-pivot helper
+# ──────────────────────────────
+def pivot_players(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Build a “wide” table: one row per player, one column per subcategory,
+    cell = poisson_mean. Ensures every row has **all** columns so the CSV
+    header includes pitcher-only and batter-only props.
+
+    Only categories pitcher_props / batter_props are considered.
+    """
+    table: dict[str, dict[str, Any]] = defaultdict(dict)
+    all_subcats: set[str] = set()
+
+    for r in rows:
+        if r["category"] not in {"pitcher_props", "batter_props"}:
+            continue
+        if r["player"] is None:
+            continue
+
+        subcat = r["subcategory"]
+        all_subcats.add(subcat)
+
+        player_row = table[r["player"]]
+        player_row["player"] = r["player"]
+        player_row[subcat] = r["poisson_mean"]
+
+    # ensure every row has every subcategory key
+    for row in table.values():
+        for subcat in all_subcats:
+            row.setdefault(subcat, None)
+
+    return list(table.values())
+
+
+# ──────────────────────────────
+# 3) Convenience wrapper
+# ──────────────────────────────
+def parse_and_pivot(
+    payloads: Dict[str, Dict[str, Any]],
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    detailed = parse_main(payloads)
+    pivoted = pivot_players(detailed)
+    return detailed, pivoted
+
+
+# ──────────────────────────────
+# Demo when executed directly
 # ──────────────────────────────
 if __name__ == "__main__":  # pragma: no cover
-    sample = {
-        "pitcher_props/triples_ou": {
+    # Quick sanity demo
+    demo = {
+        "pitcher_props/strikeouts_ou": {
             "selections": [
                 {
                     "label": "Over",
-                    "participants": [{"name": "John"}],
-                    "points": 0.5,
-                    "displayOdds": {"american": "-110", "decimal": 1.91},
+                    "participants": [{"name": "Max Fried"}],
+                    "points": 6.5,
+                    "displayOdds": {"american": "+120", "decimal": 2.2},
                 },
                 {
                     "label": "Under",
-                    "participants": [{"name": "John"}],
-                    "points": 0.5,
-                    "displayOdds": {"american": "-110", "decimal": 1.91},
+                    "participants": [{"name": "Max Fried"}],
+                    "points": 6.5,
+                    "displayOdds": {"american": "-140", "decimal": 1.71},
                 },
             ]
-        }
+        },
+        "batter_props/doubles": {
+            "selections": [
+                {
+                    "label": "Over",
+                    "participants": [{"name": "Max Fried"}],
+                    "points": 0.5,
+                    "displayOdds": {"american": "+200", "decimal": 3.0},
+                },
+                {
+                    "label": "Under",
+                    "participants": [{"name": "Max Fried"}],
+                    "points": 0.5,
+                    "displayOdds": {"american": "-300", "decimal": 1.33},
+                },
+            ]
+        },
     }
+
+    bets, players = parse_and_pivot(demo)
 
     from pprint import pprint
 
-    pprint(parse_main(sample))
+    pprint(players)
