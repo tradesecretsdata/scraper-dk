@@ -24,6 +24,7 @@ from typing import Any, Dict, List
 
 from pipeline.fetch import fetch_main
 from pipeline.parse import parse_and_pivot  # ← returns bets, players
+from pipeline.projections import compute_batter_fpts
 from utils.s3_utils import build_key, upload_csv, upload_json
 from combine import combine_main
 
@@ -81,6 +82,9 @@ def lambda_handler(
         # 3) Parse → two tables
         bet_rows, player_rows = parse_and_pivot(raw_payloads)
         logger.info("Parsed bets=%d  players=%d", len(bet_rows), len(player_rows))
+
+        # 3½) Compute fantasy point projections for batters
+        player_rows = compute_batter_fpts(player_rows)
 
         # 4) Upload processed CSVs (bets / players)
         bets_key = build_key(proc_prefix, "bets", f"{timestamp}.csv")
