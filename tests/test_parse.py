@@ -71,3 +71,31 @@ def test_parse_home_runs_one_sided():
 
     # Poisson mean should be > 0 for a non-zero HR probability
     assert row["poisson_mean"] and row["poisson_mean"] > 0
+
+
+def test_pivot_includes_hit_by_pitch():
+    # Minimal rows example for a batter prop to ensure player is included.
+    responses = {
+        "batter_props/singles": {
+            "selections": [
+                {
+                    "label": "Over",
+                    "participants": [{"name": "Batter"}],
+                    "points": 0.5,
+                    "displayOdds": {"american": "-110", "decimal": 1.91},
+                },
+                {
+                    "label": "Under",
+                    "participants": [{"name": "Batter"}],
+                    "points": 0.5,
+                    "displayOdds": {"american": "-110", "decimal": 1.91},
+                },
+            ]
+        }
+    }
+
+    detailed, pivot = parse_mod.parse_and_pivot(responses)
+    assert len(pivot) == 1
+    row = pivot[0]
+    # Constant 0.04 assigned
+    assert row["hit_by_pitch"] == pytest.approx(0.04)

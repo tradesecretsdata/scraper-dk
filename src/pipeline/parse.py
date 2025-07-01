@@ -269,6 +269,11 @@ def pivot_players(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         player_row["player"] = r["player"]
         player_row[subcat] = r["poisson_mean"]
 
+    # Add constant Hit By Pitch rate
+    all_subcats.add("hit_by_pitch")
+    for row in table.values():
+        row["hit_by_pitch"] = 0.04
+
     # ensure every row has every subcategory key
     for row in table.values():
         for subcat in all_subcats:
