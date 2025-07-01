@@ -1,61 +1,80 @@
-import re
-from types import SimpleNamespace
+import types
+from pathlib import Path
 
-import pipeline.fetch as fetch
-
-
-# ---------------------------------------------------------------------------
-# Pure helper tests ----------------------------------------------------------
-# ---------------------------------------------------------------------------
+from pipeline import fetch as fetch_mod
 
 
-def test_slugify_basic_cases():
-    """slugify should lower‑case, strip special chars, and dash‑separate words."""
-
-    cases = {
-        "Total Bases (OU)": "total-bases-ou",
-        "RBI/HR - Player": "rbihr-player",
-        # '+' is removed and words are dash‑joined
-        "Walks+Hits / 9 Innings": "walks-hits-9-innings",
-        "  Extra  Spaces  ": "extra-spaces",
+def _stub_load_yaml(monkeypatch):
+    """Patch ``_load_yaml`` to avoid touching the real filesystem."""
+    cfg_yaml = {
+        "requests": {
+            "baseUrl": "https://example.com",
+            "headers": {},
+            "sleepSecondsMin": 0,
+            "sleepSecondsMax": 0,
+        }
+    }
+    api_yaml = {
+        "mlb": {
+            "eventGroupId": 1,
+            "categories": {
+                "Hits": {
+                    "categoryId": 10,
+                    "subCategories": {
+                        "Total Bases": {"subCategoryId": 100},
+                    },
+                }
+            },
+        }
     }
 
-    for original, expected in cases.items():
-        assert fetch.slugify(original) == expected
+    def _fake_loader(path: Path):  # noqa: D401
+        if "config" in str(path):
+            return cfg_yaml
+        return api_yaml
+
+    monkeypatch.setattr(fetch_mod, "_load_yaml", _fake_loader, raising=True)
 
 
-def test_utc_stamp_format():
-    """utc_stamp should return YYYYMMDD-HHMMSS (UTC) with digits only."""
+class _FakeResp:  # noqa: D101
+    def __init__(self, payload):
+        self._payload = payload
 
-    stamp = fetch.utc_stamp()
-    assert re.fullmatch(r"\d{8}-\d{6}", stamp), stamp
+    def json(self):  # noqa: D401
+        return self._payload
+
+    def raise_for_status(self):  # noqa: D401
+        return None
 
 
-def test_build_session_sets_headers_and_timeout(monkeypatch):
-    """build_session should copy headers and inject default timeout."""
+class _FakeSession(types.SimpleNamespace):  # noqa: D101
+    def __init__(self, payload):
+        super().__init__(headers={})
+        self._payload = payload
 
-    cfg = {
-        "headers": {"User-Agent": "pytest-agent"},
-        "retriesMax": 1,
-        "timeout": 5,
-    }
+    def get(self, url):  # noqa: D401
+        self.last_url = url
+        return _FakeResp(self._payload)
 
-    captured: dict[str, object] = {}
 
-    def fake_request(self, method, url, **kwargs):  # noqa: ANN001
-        captured.update(kwargs)
-        return SimpleNamespace(status_code=200, json=lambda: {})
+def test_fetch_main(monkeypatch):
+    """fetch_main should return mapping ``cat/subcat`` → payload dict."""
+    _stub_load_yaml(monkeypatch)
 
-    # Patch *before* building the session so the wrapped method is our fake
-    import requests  # local import to ensure real requests is available
+    dummy_payload = {"selections": []}
+    monkeypatch.setattr(
+        fetch_mod,
+        "_build_session",
+        lambda cfg: _FakeSession(dummy_payload),
+        raising=True,
+    )
 
-    monkeypatch.setattr(requests.Session, "request", fake_request, raising=True)
+    # eliminate sleeps/randomness
+    monkeypatch.setattr(fetch_mod.random, "uniform", lambda *_: 0)
+    monkeypatch.setattr(fetch_mod.time, "sleep", lambda *_: None)
 
-    sess = fetch.build_session(cfg)
+    result = fetch_mod.fetch_main()
 
-    # Headers should be copied
-    assert sess.headers["User-Agent"] == "pytest-agent"
-
-    # The wrapped request should default the timeout to cfg["timeout"]
-    sess.request("GET", "https://example.com")
-    assert captured.get("timeout") == 5
+    # Expect exactly one key → 'hits/total'
+    assert list(result) == ["hits/total_bases"]
+    assert result["hits/total_bases"] == dummy_payload
