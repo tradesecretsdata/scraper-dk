@@ -53,3 +53,26 @@ def upload_csv(text: str, key: str, bucket: str | None = None) -> None:
         ContentType="text/csv",
     )
     logger.info("✅  CSV uploaded → s3://%s/%s", bucket, key)
+
+
+# ---------------------------------------------------------------------------
+# Download helpers – **no pandas**
+# ---------------------------------------------------------------------------
+
+
+def read_json(key: str, bucket: str | None = None) -> Any:  # noqa: D401
+    """Return a parsed JSON object from ``s3://{bucket}/{key}``."""
+    bucket = bucket or _default_bucket()
+    resp = _S3.get_object(Bucket=bucket, Key=key)
+    text = resp["Body"].read().decode()
+    logger.info("📥  JSON downloaded ← s3://%s/%s", bucket, key)
+    return json.loads(text)
+
+
+def read_csv(key: str, bucket: str | None = None) -> str:  # noqa: D401
+    """Return raw CSV text (UTF-8) from ``s3://{bucket}/{key}``."""
+    bucket = bucket or _default_bucket()
+    resp = _S3.get_object(Bucket=bucket, Key=key)
+    text = resp["Body"].read().decode()
+    logger.info("📥  CSV downloaded ← s3://%s/%s", bucket, key)
+    return text
