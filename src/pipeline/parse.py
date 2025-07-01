@@ -46,6 +46,34 @@ def _vig_free_decimal(p_over: float, p_under: float) -> Tuple[float, float]:
     return 1 / (p_over / vig), 1 / (p_under / vig)
 
 
+def _vig_free_one_sided(american: int, vig_rate: float = 0.13) -> tuple[float, int]:
+    """Return vig-free decimal and american odds for a *one-sided* market.
+
+    DraftKings' player *Home Runs* market lists only the price for a player to
+    hit **1+** HRs (i.e. *over* 0.5 HRs). Historical scraping shows the built-in
+    margin on these one-sided markets is about ``vig_rate`` (default 13%).
+
+    We back out the vig by:
+      1. converting the quoted American price to an implied probability,
+      2. scaling that probability down by *(1 + vig_rate)*,
+      3. converting the adjusted probability back to odds.
+    """
+    # Step 1 – quoted probability (includes vig)
+    p_obs = _american_to_prob(american)
+    if p_obs is None:
+        return None, None  # type: ignore[misc]
+
+    # Step 2 – strip vig
+    p_vf = p_obs / (1.0 + vig_rate)
+    if p_vf <= 0 or p_vf >= 1:
+        return None, None  # improbable / bad data
+
+    # Step 3 – back to odds
+    dec = 1.0 / p_vf
+    amer = _decimal_to_american(dec)
+    return dec, amer
+
+
 # ──────────────────────────────
 #   Poisson helpers
 # ──────────────────────────────
@@ -95,6 +123,69 @@ def parse_main(payloads: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
 
         for sel in payload["selections"]:
             label = str(sel.get("label", "")).lower()
+
+            # Special-case: *Home Runs* milestones are one-sided ("1+" etc.).
+            # Treat the "1+" selection as an "over" bet for a 0.5 HR line.
+            is_home_runs = subcategory == "home_runs"
+            if is_home_runs:
+                # Keep only the *1+* line – ignore 2+ HR, 3+ HR, …
+                if label != "1+":  # label values like "1+", "2+", …
+                    continue
+
+                player = sel.get("participants", [{}])[0].get("name")
+                # Points is fixed at 0.5 for 1+ HR line ↔ over 0.5 HRs.
+                points = 0.5
+
+                american_raw = _normalize_american(sel["displayOdds"]["american"])
+                decimal_raw = float(sel["displayOdds"]["decimal"])
+
+                vf_over_dec, vf_over_amer = _vig_free_one_sided(american_raw)
+
+                # Under price not quoted – derive fair odds as complement prob.
+                if vf_over_dec is not None:
+                    p_over_vf = 1.0 / vf_over_dec
+                    p_under_vf = 1.0 - p_over_vf
+                    vf_under_dec = 1.0 / p_under_vf if p_under_vf > 0 else None
+                    vf_under_amer = (
+                        _decimal_to_american(vf_under_dec) if vf_under_dec else None
+                    )
+                else:
+                    p_over_vf = None
+                    vf_under_dec = vf_under_amer = None
+
+                k_floor = 0  # over 0.5 HRs → floor(0.5) == 0
+                poisson_mean = (
+                    _solve_lambda(k_floor, p_over_vf) if p_over_vf is not None else None
+                )
+
+                rows.append(
+                    {
+                        "category": category,
+                        "subcategory": subcategory,
+                        "player": player,
+                        "points": points,
+                        # observed odds (only over side available)
+                        "over_decimal_odds": decimal_raw,
+                        "over_american_odds": american_raw,
+                        "under_decimal_odds": None,
+                        "under_american_odds": None,
+                        # vig-free odds
+                        "vig_free_over_decimal_odds": vf_over_dec,
+                        "vig_free_under_decimal_odds": vf_under_dec,
+                        "vig_free_over_american_odds": vf_over_amer,
+                        "vig_free_under_american_odds": vf_under_amer,
+                        # model inputs
+                        "poisson_mean": poisson_mean,
+                    }
+                )
+
+                # Skip default over/under logic for home_runs
+                continue
+
+            # ───────────────────────────────────────────────
+            # Regular two-sided markets (Over / Under)
+            # ───────────────────────────────────────────────
+
             if label not in {"over", "under"}:
                 continue
 
@@ -156,7 +247,7 @@ def parse_main(payloads: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
 # ──────────────────────────────
 def pivot_players(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    Build a “wide” table: one row per player, one column per subcategory,
+    Build a "wide" table: one row per player, one column per subcategory,
     cell = poisson_mean. Ensures every row has **all** columns so the CSV
     header includes pitcher-only and batter-only props.
 
