@@ -116,19 +116,86 @@ def load_draftable_rows(
     return rows
 
 
-# Convenience wrapper (placeholder until Step 3)
-# ───────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# Step 3 – merge with player prop data
+# ---------------------------------------------------------------------------
+
+
+def _build_player_index(rows: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """Return mapping ``player_name`` → *row* built from *player_rows*."""
+    idx: dict[str, dict[str, Any]] = {}
+    for r in rows:
+        name = r.get("player")
+        if name:
+            idx[str(name)] = r
+    return idx
+
+
+def merge_rows(
+    *,
+    player_rows: List[Dict[str, Any]],
+    draft_rows: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Return **combined** rows by joining on player-name.
+
+    • Draftable rows use key ``name``.
+    • Player prop rows use key ``player``.
+
+    A *left-outer* style join is applied:
+      – Every draftable row is preserved with added player-prop columns.
+      – Player-only rows with **no** matching draft row are appended as
+        additional rows (only props columns).
+    """
+
+    idx = _build_player_index(player_rows)
+
+    merged: list[dict[str, Any]] = []
+    matched_players: set[str] = set()
+
+    for d in draft_rows:
+        name = str(d.get("name"))
+        combined = {**d}
+
+        prow = idx.get(name)
+        if prow:
+            combined.update(prow)
+            matched_players.add(name)
+
+        merged.append(combined)
+
+    # Append unmatched player prop rows
+    for name, prow in idx.items():
+        if name in matched_players:
+            continue
+        merged.append(dict(prow))
+
+    logger.info(
+        "Merged draftable=%d with player_props=%d → rows=%d",
+        len(draft_rows),
+        len(player_rows),
+        len(merged),
+    )
+    return merged
+
+
+# ---------------------------------------------------------------------------
+# Public combine_main
+# ---------------------------------------------------------------------------
 
 
 def combine_main(
     *,
+    player_rows: List[Dict[str, Any]],
     date: str | None = None,
     sport: str = "mlb",
     bucket: str | None = None,
 ) -> List[Dict[str, Any]]:
-    """Currently just calls :func:`load_draftable_rows`.
+    """High-level helper used by Lambda handler.
 
-    In Step 3 we will accept *player_rows* and return the merged result.
+    1. Loads DraftKings *draftable* player CSVs from S3
+    2. Merges them onto *player_rows* (pivoted prop table)
+    3. Returns the combined row list ready for CSV upload
     """
 
-    return load_draftable_rows(date=date, sport=sport, bucket=bucket)
+    draft_rows = load_draftable_rows(date=date, sport=sport, bucket=bucket)
+    return merge_rows(player_rows=player_rows, draft_rows=draft_rows)

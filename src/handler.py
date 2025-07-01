@@ -1,7 +1,8 @@
 """AWS Lambda entry point – now uploads TWO processed CSVs.
 
-  • {PROC_PREFIX}/bets/{timestamp}.csv     – detailed, one row per bet
-  • {PROC_PREFIX}/players/{timestamp}.csv  – one row per player (pivot)
+  • {PROC_PREFIX}/bets/{timestamp}.csv      – detailed, one row per bet
+  • {PROC_PREFIX}/players/{timestamp}.csv   – one row per player (pivot)
+  • {PROC_PREFIX}/combined/{timestamp}.csv  – merged DraftKings + props
 
 Environment vars
 ----------------
@@ -24,6 +25,7 @@ from typing import Any, Dict, List
 from pipeline.fetch import fetch_main
 from pipeline.parse import parse_and_pivot  # ← returns bets, players
 from utils.s3_utils import build_key, upload_csv, upload_json
+from combine import combine_main
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -80,20 +82,31 @@ def lambda_handler(
         bet_rows, player_rows = parse_and_pivot(raw_payloads)
         logger.info("Parsed bets=%d  players=%d", len(bet_rows), len(player_rows))
 
-        # 4) Upload processed CSVs
+        # 4) Upload processed CSVs (bets / players)
         bets_key = build_key(proc_prefix, "bets", f"{timestamp}.csv")
         players_key = build_key(proc_prefix, "players", f"{timestamp}.csv")
 
         upload_csv(_rows_to_csv(bet_rows), bets_key, bucket=bucket)
         upload_csv(_rows_to_csv(player_rows), players_key, bucket=bucket)
 
-        logger.info("🎉 Uploaded bets → %s  and players → %s", bets_key, players_key)
+        # 5) Combine with draftable CSVs
+        combined_rows = combine_main(player_rows=player_rows, bucket=bucket)
+        combined_key = build_key(proc_prefix, "combined", f"{timestamp}.csv")
+        upload_csv(_rows_to_csv(combined_rows), combined_key, bucket=bucket)
+
+        logger.info(
+            "🎉 Uploaded bets → %s, players → %s, combined → %s",
+            bets_key,
+            players_key,
+            combined_key,
+        )
 
         # Return counts for monitoring
         return {
             "status": "ok",
             "bets_rows": len(bet_rows),
             "players_rows": len(player_rows),
+            "combined_rows": len(combined_rows),
         }
 
     except Exception as exc:

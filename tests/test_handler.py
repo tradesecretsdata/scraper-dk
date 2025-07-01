@@ -74,24 +74,36 @@ def test_lambda_handler(monkeypatch):
     monkeypatch.setattr(s3_mod, "upload_json", fake_upload_json, raising=True)
     monkeypatch.setattr(s3_mod, "upload_csv", fake_upload_csv, raising=True)
 
+    # -- stub combine_main -----------------------------------------------
+
+    def fake_combine_main(*_, **__):  # noqa: D401
+        return [{"mock": "row"}]
+
+    # patch the symbol inside handler after import (later) ----------------
+
     # -- run handler -------------------------------------------------------
     handler = importlib.import_module("handler")
+
+    monkeypatch.setattr(handler, "combine_main", fake_combine_main, raising=True)
     result = handler.lambda_handler({}, {})  # type: ignore[arg-type]
 
     # -- result assertions -------------------------------------------------
     assert result["status"] == "ok"
     assert result["bets_rows"] == 2  # two detailed rows
     assert result["players_rows"] == 1  # one player pivot row
+    assert result["combined_rows"] == 1  # fake Combine returns 1 row
 
     # -- S3 key assertions -------------------------------------------------
     assert len(raw_keys) == 2  # raw JSON uploads (2 endpoints)
-    assert len(csv_keys) == 2  # two CSV uploads
+    assert len(csv_keys) == 3  # three CSV uploads
     assert any("/bets/" in k for k in csv_keys)
     assert any("/players/" in k for k in csv_keys)
+    assert any("/combined/" in k for k in csv_keys)
 
     # -- content assertions ------------------------------------------------
     bets_csv = next(text for key, text in csv_bodies if "/bets/" in key)
     players_csv = next(text for key, text in csv_bodies if "/players/" in key)
+    combined_csv = next(text for key, text in csv_bodies if "/combined/" in key)
 
     # bets table: 2 rows, columns include subcategory
     bets_rows = list(csv.DictReader(StringIO(bets_csv)))
@@ -104,3 +116,7 @@ def test_lambda_handler(monkeypatch):
     row = players_rows[0]
     assert row["player"] == "Jane"
     assert "triples_ou" in row and "doubles" in row
+
+    # combined CSV should match fake stub
+    comb_rows = list(csv.DictReader(StringIO(combined_csv)))
+    assert len(comb_rows) == 1 and comb_rows[0]["mock"] == "row"

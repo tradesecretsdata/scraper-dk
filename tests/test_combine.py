@@ -69,3 +69,35 @@ def test_load_draftable_rows(monkeypatch):
     # each row should preserve original CSV columns
     assert {r["name"] for r in rows} == {"Alice", "Bob"}
     assert {r["position"] for r in rows} == {"P", "C"}
+
+
+# ---------------------------------------------------------------------------
+# Merge test
+# ---------------------------------------------------------------------------
+
+
+def test_merge_rows():
+    draft_rows = [
+        {"name": "Alice", "position": "P", "salary": 8000, "slate_id": "1"},
+        {"name": "Bob", "position": "C", "salary": 5000, "slate_id": "1"},
+    ]
+
+    player_rows = [
+        {"player": "Alice", "doubles": 0.2},
+        {"player": "Carl", "doubles": 0.3},  # not in draft rows
+    ]
+
+    merged = combine_mod.merge_rows(player_rows=player_rows, draft_rows=draft_rows)
+
+    # Should include 3 rows (2 draft + 1 unmatched player)
+    assert len(merged) == 3
+
+    # Alice row merges
+    alice = next(
+        r for r in merged if r.get("name") == "Alice" or r.get("player") == "Alice"
+    )
+    assert alice["position"] == "P" and alice["doubles"] == 0.2
+
+    # Carl row carried forward
+    carl = next(r for r in merged if r.get("player") == "Carl")
+    assert carl["doubles"] == 0.3 and "position" not in carl
