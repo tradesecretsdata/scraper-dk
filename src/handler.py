@@ -43,10 +43,25 @@ def _utc_stamp() -> str:
 
 
 def _rows_to_csv(rows: List[Dict[str, Any]]) -> str:
-    """Convert list-of-dict rows → CSV string."""
+    """Convert list-of-dict rows → CSV string with all columns present.
+
+    The original version relied on the *first* row to define the header,
+    causing later rows that had additional keys to drop those columns – this
+    hid player-prop stats in the *combined* CSV.  We now build the header as
+    the *union* of keys across all rows, preserving order (first-seen wins).
+    """
     if not rows:
         return ""
-    header = list(rows[0])
+
+    # Build ordered header union
+    seen: set[str] = set()
+    header: list[str] = []
+    for r in rows:
+        for k in r.keys():
+            if k not in seen:
+                seen.add(k)
+                header.append(k)
+
     buf = io.StringIO()
     writer = csv.DictWriter(buf, fieldnames=header, extrasaction="ignore")
     writer.writeheader()
