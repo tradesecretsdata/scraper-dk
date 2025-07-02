@@ -11,9 +11,9 @@ def test_compute_batter_fpts_basic():
         "home_runs": 0.05,
         "rbis": 0.8,
         "runs": 0.9,
-        "walks": 0.7,
+        "walks_batter_ou": 0.7,
         "hit_by_pitch": 0.04,
-        "stolen": 0.2,
+        "stolen_bases": 0.2,
     }
 
     res = compute_batter_fpts([row])[0]

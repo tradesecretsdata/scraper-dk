@@ -179,6 +179,28 @@ def merge_rows(
 
 
 # ---------------------------------------------------------------------------
+# Column sanitization helper (Step 5 fix)
+# ---------------------------------------------------------------------------
+
+
+def sanitize_player_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Return *rows* with every key having trailing '_ou' / '_OU' removed.
+
+    Operates **in-place** on each row – this keeps downstream code untouched
+    and avoids unnecessary copies in Lambda memory-constrained environment.
+    """
+    for r in rows:
+        for key in list(r.keys()):
+            if key.lower().endswith("_ou"):
+                base = key[:-3]
+                # Do not overwrite existing base key if already present
+                if base not in r:
+                    r[base] = r[key]
+                del r[key]
+    return rows
+
+
+# ---------------------------------------------------------------------------
 # Public combine_main
 # ---------------------------------------------------------------------------
 

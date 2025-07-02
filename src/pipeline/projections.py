@@ -40,9 +40,9 @@ _BATTER_WEIGHTS: dict[str, float] = {
     "home_runs": 10.0,
     "rbis": 2.0,
     "runs": 2.0,
-    "walks": 2.0,
+    "walks_batter": 2.0,
     "hit_by_pitch": 2.0,
-    "stolen": 5.0,
+    "stolen_bases": 5.0,
 }
 
 
@@ -66,7 +66,9 @@ def compute_batter_fpts(player_rows: List[Dict[str, Any]]) -> List[Dict[str, Any
     for row in player_rows:
         fpts = 0.0
         for stat, weight in _BATTER_WEIGHTS.items():
-            fpts += weight * _safe(row.get(stat))
+            # Accept both raw stat key and *_ou variants
+            val = row.get(stat) if stat in row else row.get(f"{stat}_ou")
+            fpts += weight * _safe(val)
         row["fpts_batter"] = fpts
     return player_rows
 
