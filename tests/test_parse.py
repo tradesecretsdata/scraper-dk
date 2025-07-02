@@ -99,3 +99,34 @@ def test_pivot_includes_hit_by_pitch():
     row = pivot[0]
     # Constant 0.04 assigned
     assert row["hit_by_pitch"] == pytest.approx(0.04)
+
+
+def test_parse_triples_one_sided():
+    responses = {
+        "batter_props/triples": {
+            "selections": [
+                {
+                    "label": "1+",
+                    "participants": [{"name": "Speedster"}],
+                    "points": None,
+                    "displayOdds": {"american": "+700", "decimal": 8.0},
+                },
+                {
+                    "label": "2+",
+                    "participants": [{"name": "Speedster"}],
+                    "points": None,
+                    "displayOdds": {"american": "+2200", "decimal": 23.0},
+                },
+            ]
+        }
+    }
+
+    rows = parse_mod.parse_main(responses)
+    assert len(rows) == 1
+    row = rows[0]
+
+    assert row["subcategory"] == "triples"
+    assert row["points"] == 0.5
+    assert row["over_american_odds"] == 700
+    assert row["vig_free_over_american_odds"] > 700
+    assert row["poisson_mean"] and row["poisson_mean"] > 0

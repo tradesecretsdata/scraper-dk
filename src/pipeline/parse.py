@@ -126,14 +126,14 @@ def parse_main(payloads: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
 
             # Special-case: *Home Runs* milestones are one-sided ("1+" etc.).
             # Treat the "1+" selection as an "over" bet for a 0.5 HR line.
-            is_home_runs = subcategory == "home_runs"
-            if is_home_runs:
-                # Keep only the *1+* line – ignore 2+ HR, 3+ HR, …
+            one_sided_subcats = {"home_runs", "triples"}
+            if subcategory in one_sided_subcats:
+                # Keep only the *1+* line – ignore 2+, 3+, … milestones
                 if label != "1+":  # label values like "1+", "2+", …
                     continue
 
                 player = sel.get("participants", [{}])[0].get("name")
-                # Points is fixed at 0.5 for 1+ HR line ↔ over 0.5 HRs.
+                # Points is fixed at 0.5 for 1+ milestone ↔ over 0.5.
                 points = 0.5
 
                 american_raw = _normalize_american(sel["displayOdds"]["american"])
@@ -153,7 +153,7 @@ def parse_main(payloads: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
                     p_over_vf = None
                     vf_under_dec = vf_under_amer = None
 
-                k_floor = 0  # over 0.5 HRs → floor(0.5) == 0
+                k_floor = 0  # over 0.5 → floor(0.5) == 0
                 poisson_mean = (
                     _solve_lambda(k_floor, p_over_vf) if p_over_vf is not None else None
                 )

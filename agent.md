@@ -16,14 +16,14 @@
 - You can find the point value that each batter statistic contributes to fpts_batter in the docstring at the top of projections.py.
 - The compute_batter_fpts() will happen in handler.py between steps 3 and 4, and that's what will be uploaded to s3 instead of the output from parse_and_pivot.
 
-4. Fix: batter fpts
+4. Feature: Add triples
+
+- Repeat the steps in item (1) but for "Triples" instead of "Home Runs"
+
+5. Fix: batter fpts
 
 - Batter fantasy points are not being calculated correctly because the table fields do not match the keys in \_BATTER_WEIGHTS.
 - In combine.py, let's clean up the column names. Remove the suffix '\_ou' or '\_OU' from every column name in the player_rows data.
 - In projections.py, match column name to \_BATTER_WEIGHTS key as follows: {singles: singles, doubles: doubles, triples: triples, home_runs: home_runs, rbis: rbis, runs: runs, walks_batter: walks, hit_by_pitch: hit_by_pitch, stolen_bases: stolen}
-
-4. Feature: Add triples (\*\*\*\*MUST FIND SUBCATEGORYID AND ADD TO dk-api.yaml BEFORE THIS)
-
-- Repeat the steps in item (1) but for "Triples" instead of "Home Runs"
 
 6. Feature: Fantasy point projections for pitchers
