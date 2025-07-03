@@ -41,4 +41,4 @@
 - Drop duplicate rows in the combined table.
 - Drop rows where the "slate_id" column equals 0.
 
-8. Feature: Fantasy point projections for pitchers
+9. Feature: Fantasy point projections for pitchers

@@ -201,6 +201,39 @@ def sanitize_player_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
+# Post-merge cleanup helper (Step 8 fix)
+# ---------------------------------------------------------------------------
+
+
+def clean_combined_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Return *rows* with duplicates dropped and slate_id != 0.
+
+    Duplicate detection is based on the **full row content**: rows that are
+    byte-for-byte identical after converting to a sorted tuple of key/value
+    pairs are considered duplicates (first occurrence is kept).
+
+    Rows where the ``slate_id`` column is missing or equals ``0`` (string or
+    int) are *excluded* from the result.
+    """
+
+    seen: set[tuple] = set()
+    cleaned: list[dict[str, Any]] = []
+
+    for r in rows:
+        slate = str(r.get("slate_id", "")).strip()
+        if slate == "0" or slate == "":
+            continue  # drop invalid slate rows
+
+        key_tuple = tuple(sorted(r.items()))
+        if key_tuple in seen:
+            continue  # duplicate row – skip
+        seen.add(key_tuple)
+        cleaned.append(r)
+
+    return cleaned
+
+
+# ---------------------------------------------------------------------------
 # Public combine_main
 # ---------------------------------------------------------------------------
 
@@ -220,4 +253,5 @@ def combine_main(
     """
 
     draft_rows = load_draftable_rows(date=date, sport=sport, bucket=bucket)
-    return merge_rows(player_rows=player_rows, draft_rows=draft_rows)
+    merged = merge_rows(player_rows=player_rows, draft_rows=draft_rows)
+    return clean_combined_rows(merged)
