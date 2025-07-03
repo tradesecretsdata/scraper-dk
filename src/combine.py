@@ -259,7 +259,8 @@ def finalize_combined_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     }
     _DROP_KEYS = {
         "slate_id",
-        "playerid",
+        "playerid",  # lowercase variant
+        "playerId",  # camelCase variant (Step 14 fix)
         "game_start",
     }
 
@@ -273,6 +274,11 @@ def finalize_combined_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         "team",
         "opponent",
         "opponent_sp",
+        # ── slate metadata (Step 13 feature) ───────────────
+        "game_type",
+        "num_games",
+        "slate_start",
+        "slate_display",
         # ── batter stats (Step 12 fix – reorder stat columns) ──
         "singles",
         "doubles",
@@ -303,7 +309,14 @@ def finalize_combined_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             if k in _DROP_KEYS:
                 r.pop(k, None)
 
-        # If both 'player' and 'name' somehow remain, prefer 'player'
+        # ----- slate_display (Step 13) ----------------------------------
+        if "slate_display" not in r:
+            slate_start_val = r.get("slate_start")
+            num_games_val = r.get("num_games")
+            if slate_start_val is not None and num_games_val is not None:
+                r["slate_display"] = f"{slate_start_val} - {num_games_val} games"
+
+        # Ensure we don't keep both 'name' and renamed 'player'
         if "name" in r and "player" in r:
             r.pop("name")
 
