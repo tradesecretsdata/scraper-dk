@@ -26,4 +26,19 @@
 - In combine.py, let's clean up the column names. Remove the suffix '\_ou' or '\_OU' from every column name in the player_rows data.
 - In projections.py, match column name to \_BATTER_WEIGHTS key as follows: {singles: singles, doubles: doubles, triples: triples, home_runs: home_runs, rbis: rbis, runs: runs, walks_batter: walks, hit_by_pitch: hit_by_pitch, stolen_bases: stolen}
 
-6. Feature: Fantasy point projections for pitchers
+6. Feature: create "role" column
+
+- Move the fantasy point projection computation to after the 'combine' step.
+- Create a new column "role". The value should be "Pitcher" if the players position (pos) is "SP" or "RP", and otherwise the value should be "Batter"
+
+7. Feature: Change "batter_fpts" to just "fpts"
+
+- Change the column name "batter_fpts" to just "fpts".
+- If the player's role is "Batter", use the existing batter_fpts logic to calculate fpts. If the player's role is "Pitcher", leave the cell empty for now; we have not built the projection logic for pitchers yet.
+
+8. Fix: clean up table
+
+- Drop duplicate rows in the combined table.
+- Drop rows where the "slate_id" column equals 0.
+
+8. Feature: Fantasy point projections for pitchers

@@ -1,6 +1,6 @@
 """
 Pitchers
-        • Innings pitched = 2.25 = outs recorded / 3
+        • Innings pitched = 2.25 (computed from outs recorded divided by 3)
         • Strikeout = 2
         • Win = 4
                 ○ Definition: pitcher at the time the team takes the lead and does not relinquish it
@@ -73,7 +73,30 @@ def compute_batter_fpts(player_rows: List[Dict[str, Any]]) -> List[Dict[str, Any
     return player_rows
 
 
+# ───────────────────────────────────────────────────────────────
+# Helper – assign player role
+# ───────────────────────────────────────────────────────────────
+
+
+def add_role_column(player_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Add a ``role`` column based on the player's *pos* value.
+
+    A player is considered a **Pitcher** when ``pos`` equals ``SP`` or
+    ``RP`` (case-insensitive). All other positions are treated as
+    **Batter**.
+
+    The function mutates *player_rows* in place and returns the same list for
+    convenience.
+    """
+
+    for row in player_rows:
+        pos_val = str(row.get("pos", "")).strip().upper()
+        row["role"] = "Pitcher" if pos_val in {"SP", "RP"} else "Batter"
+    return player_rows
+
+
 # __all__ for export convenience
 __all__ = [
     "compute_batter_fpts",
+    "add_role_column",
 ]

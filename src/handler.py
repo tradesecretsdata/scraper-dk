@@ -24,7 +24,7 @@ from typing import Any, Dict, List
 
 from pipeline.fetch import fetch_main
 from pipeline.parse import parse_and_pivot  # ← returns bets, players
-from pipeline.projections import compute_batter_fpts
+from pipeline.projections import compute_batter_fpts, add_role_column
 from utils.s3_utils import build_key, upload_csv, upload_json
 from combine import combine_main, sanitize_player_rows
 
@@ -98,9 +98,8 @@ def lambda_handler(
         bet_rows, player_rows = parse_and_pivot(raw_payloads)
         logger.info("Parsed bets=%d  players=%d", len(bet_rows), len(player_rows))
 
-        # 3½) Normalize column names and compute fantasy point projections
+        # 3½) Normalize column names (no fantasy point projections here – moved after combine)
         player_rows = sanitize_player_rows(player_rows)
-        player_rows = compute_batter_fpts(player_rows)
 
         # 4) Upload processed CSVs (bets / players)
         bets_key = build_key(proc_prefix, "bets", f"{timestamp}.csv")
@@ -111,6 +110,12 @@ def lambda_handler(
 
         # 5) Combine with draftable CSVs
         combined_rows = combine_main(player_rows=player_rows, bucket=bucket)
+
+        # 5½) Assign role and compute fantasy points on *combined* rows
+        combined_rows = add_role_column(combined_rows)
+        combined_rows = compute_batter_fpts(combined_rows)
+
+        # Now upload the combined CSV
         combined_key = build_key(proc_prefix, "combined", f"{timestamp}.csv")
         upload_csv(_rows_to_csv(combined_rows), combined_key, bucket=bucket)
 
