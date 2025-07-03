@@ -268,6 +268,7 @@ def finalize_combined_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         # ── core player info ───────────────────────────────
         "player",
         "fpts",
+        "fpts_complete",
         "dk_salary",
         "pts/$",
         "position",

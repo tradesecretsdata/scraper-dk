@@ -129,6 +129,33 @@ def compute_fpts(player_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             row["fpts"] = ""
             row["pts/$"] = ""
 
+        # ----- fpts_complete flag (Step 15) ----------------------------
+        # Determine if all required stat inputs are present (non-empty)
+        if role == "Batter":
+            required_fields = [
+                "singles",
+                "doubles",
+                "triples",
+                "home_runs",
+                "stolen_bases",
+                "runs",
+                "rbis",
+                "walks_batter",
+                "hit_by_pitch",
+            ]
+        else:  # Pitcher
+            required_fields = [
+                "earned_runs_allowed",
+                "outs_recorded",
+                "strikeouts_thrown",
+                "hits_allowed",
+                "walks_allowed",
+            ]
+
+        row["fpts_complete"] = all(
+            row.get(fld) not in (None, "") for fld in required_fields
+        )
+
         # Drop legacy key if present
         if "fpts_batter" in row:
             del row["fpts_batter"]

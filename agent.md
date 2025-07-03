@@ -66,4 +66,9 @@
 
 14. Fix: Drop the 'playerid' column in the combined data. I thought we dropped it before but it is still there. (DONE)
 
-15.
+15. Add "fpts_complete" column
+
+- Boolean column. True if none of the required fields are empty.
+- Insert to the right of the 'fpts' column.
+- Required fields for "Batter" role: singles, doubles, triples, home_runs, stolen_bases, runs, rbis, walks_batter, hit_by_pitch
+- Required fields for "Pitcher" role: earned_runs_allowed, outs_recorded, strikeouts_thrown, hits_allowed, walks_allowed
