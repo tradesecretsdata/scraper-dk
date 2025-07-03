@@ -60,8 +60,10 @@
 - Batter columns: singles, doubles, triples, home_runs, stolen_bases, runs, rbis, walks_batter, hit_by_pitch
 - Pitcher columns: earned_runs_allowed, outs_recorded, strikeouts_thrown, hits_allowed, walks_allowed
 
-13. Feature: slate_display column
+13. Feature: slate_display column (DONE)
 
 - Insert a column called slate_display (position it near the other slate-related columns) that shows "{slate_start_str} - {num_games} games"
 
-14. Fix: Drop the 'playerid' column in the combined data. I thought we dropped it before but it is still there.
+14. Fix: Drop the 'playerid' column in the combined data. I thought we dropped it before but it is still there. (DONE)
+
+15.

@@ -46,12 +46,12 @@ def _vig_free_decimal(p_over: float, p_under: float) -> Tuple[float, float]:
     return 1 / (p_over / vig), 1 / (p_under / vig)
 
 
-def _vig_free_one_sided(american: int, vig_rate: float = 0.13) -> tuple[float, int]:
+def _vig_free_one_sided(american: int, vig_rate: float = 0.15) -> tuple[float, int]:
     """Return vig-free decimal and american odds for a *one-sided* market.
 
     DraftKings' player *Home Runs* market lists only the price for a player to
     hit **1+** HRs (i.e. *over* 0.5 HRs). Historical scraping shows the built-in
-    margin on these one-sided markets is about ``vig_rate`` (default 13%).
+    margin on these one-sided markets is about ``vig_rate`` (default 15%).
 
     We back out the vig by:
       1. converting the quoted American price to an implied probability,

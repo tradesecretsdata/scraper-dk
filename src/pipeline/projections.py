@@ -4,7 +4,7 @@ Pitchers
         • Strikeout = 2
         • Win = 4
                 ○ Definition: pitcher at the time the team takes the lead and does not relinquish it
-                ○ Calculation must be based on innings pitched and game line
+                ○ Calculation must be based on innings pitched and moneyline
         • Earned run allowed = -2
         • Hit against = -0.6
         • Base on balls against = -0.6
