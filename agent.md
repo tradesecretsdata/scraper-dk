@@ -54,10 +54,10 @@
 
 11. Fix: multiply the pts/$ column by 1000 (DONE)
 
-12. Fix: Reorder stat columns
+12. Fix: Reorder stat columns (DONE)
 
 - Batter columns first, then pitcher columns, in order below
-- Batter columns: singles, doubles, triples, home_runs, stolen_bases, runs, rbis, walks_batter, hit_by_pitch, hits**runs**rbis
+- Batter columns: singles, doubles, triples, home_runs, stolen_bases, runs, rbis, walks_batter, hit_by_pitch
 - Pitcher columns: earned_runs_allowed, outs_recorded, strikeouts_thrown, hits_allowed, walks_allowed
 
 13. Feature: Fantasy point projections for pitchers

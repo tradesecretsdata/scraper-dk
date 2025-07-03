@@ -264,6 +264,7 @@ def finalize_combined_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     }
 
     _PREFERRED_ORDER = [
+        # ── core player info ───────────────────────────────
         "player",
         "fpts",
         "dk_salary",
@@ -272,6 +273,22 @@ def finalize_combined_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         "team",
         "opponent",
         "opponent_sp",
+        # ── batter stats (Step 12 fix – reorder stat columns) ──
+        "singles",
+        "doubles",
+        "triples",
+        "home_runs",
+        "stolen_bases",
+        "runs",
+        "rbis",
+        "walks_batter",
+        "hit_by_pitch",
+        # ── pitcher stats ───────────────────────────────────
+        "earned_runs_allowed",
+        "outs_recorded",
+        "strikeouts_thrown",
+        "hits_allowed",
+        "walks_allowed",
     ]
 
     for i, r in enumerate(rows):
