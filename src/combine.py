@@ -234,6 +234,78 @@ def clean_combined_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
+# Column rename/drop/reorder helper (Step 10)
+# ---------------------------------------------------------------------------
+
+
+def finalize_combined_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Apply column rename, drop, and ordering rules required before upload.
+
+    Operations applied IN-PLACE on each row:
+      1. **Rename** keys per ``_RENAME_MAP`` if present.
+      2. **Drop** keys in ``_DROP_KEYS``.
+      3. **Re-order** keys so preferred columns appear first.
+
+    The function returns *rows* (same list) for convenience.
+    """
+
+    # --- config ---------------------------------------------------------
+    _RENAME_MAP = {
+        "slate_start_str": "slate_start",
+        "name": "player",
+        "pos": "position",
+        "opp": "opponent",
+        "opp_sp": "opponent_sp",
+    }
+    _DROP_KEYS = {
+        "slate_id",
+        "playerid",
+        "game_start",
+    }
+
+    _PREFERRED_ORDER = [
+        "player",
+        "fpts",
+        "dk_salary",
+        "pts/$",
+        "position",
+        "team",
+        "opponent",
+        "opponent_sp",
+    ]
+
+    for i, r in enumerate(rows):
+        # ----- rename ----------------------------------------------------
+        for old_key, new_key in _RENAME_MAP.items():
+            if old_key in r:
+                # Always prefer the renamed value (likely string) over existing
+                r[new_key] = r.pop(old_key)
+
+        # ----- drop ------------------------------------------------------
+        for k in list(r.keys()):
+            if k in _DROP_KEYS:
+                r.pop(k, None)
+
+        # If both 'player' and 'name' somehow remain, prefer 'player'
+        if "name" in r and "player" in r:
+            r.pop("name")
+
+        # ----- reorder ---------------------------------------------------
+        ordered = {}
+        for k in _PREFERRED_ORDER:
+            if k in r:
+                ordered[k] = r[k]
+        # Append remaining keys in their existing insertion order
+        for k in r.keys():
+            if k not in ordered:
+                ordered[k] = r[k]
+        # Replace row dict in list to preserve order for CSV header union
+        rows[i] = ordered
+
+    return rows
+
+
+# ---------------------------------------------------------------------------
 # Public combine_main
 # ---------------------------------------------------------------------------
 
@@ -255,3 +327,13 @@ def combine_main(
     draft_rows = load_draftable_rows(date=date, sport=sport, bucket=bucket)
     merged = merge_rows(player_rows=player_rows, draft_rows=draft_rows)
     return clean_combined_rows(merged)
+
+
+__all__ = [
+    "load_draftable_rows",
+    "merge_rows",
+    "sanitize_player_rows",
+    "combine_main",
+    "clean_combined_rows",
+    "finalize_combined_rows",
+]

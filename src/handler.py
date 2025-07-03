@@ -27,6 +27,7 @@ from pipeline.parse import parse_and_pivot  # ← returns bets, players
 from pipeline.projections import compute_fpts, add_role_column
 from utils.s3_utils import build_key, upload_csv, upload_json
 from combine import combine_main, sanitize_player_rows
+from combine import finalize_combined_rows
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -114,6 +115,9 @@ def lambda_handler(
         # 5½) Assign role and compute fantasy points on *combined* rows
         combined_rows = add_role_column(combined_rows)
         combined_rows = compute_fpts(combined_rows)
+
+        # 5¾) Final column cleanup (rename/drop/order)
+        combined_rows = finalize_combined_rows(combined_rows)
 
         # Now upload the combined CSV
         combined_key = build_key(proc_prefix, "combined", f"{timestamp}.csv")
