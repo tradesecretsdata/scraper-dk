@@ -116,9 +116,17 @@ def compute_fpts(player_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 val = row.get(stat) if stat in row else row.get(f"{stat}_ou")
                 fpts += weight * _safe(val)
             row["fpts"] = fpts
+
+            # -- pts/$ value metric -------------------------------------
+            salary = _safe(row.get("dk_salary"))
+            if salary > 0:
+                row["pts/$"] = fpts / salary if salary else ""
+            else:
+                row["pts/$"] = ""
         else:
             # Placeholder for future pitcher logic
             row["fpts"] = ""
+            row["pts/$"] = ""
 
         # Drop legacy key if present
         if "fpts_batter" in row:

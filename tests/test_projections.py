@@ -33,3 +33,8 @@ def test_compute_batter_fpts_basic():
     )
 
     assert pytest.approx(res["fpts"], rel=1e-9) == expected
+
+    # pts/$ when dk_salary present
+    row_with_salary = dict(row, dk_salary=5000)
+    res2 = compute_fpts([row_with_salary])[0]
+    assert pytest.approx(res2["pts/$"], rel=1e-9) == expected / 5000
