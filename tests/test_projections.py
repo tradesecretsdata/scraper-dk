@@ -1,5 +1,5 @@
 import pytest
-from pipeline.projections import compute_batter_fpts
+from pipeline.projections import compute_fpts
 
 
 def test_compute_batter_fpts_basic():
@@ -16,7 +16,9 @@ def test_compute_batter_fpts_basic():
         "stolen_bases": 0.2,
     }
 
-    res = compute_batter_fpts([row])[0]
+    # Attach role before computing general fantasy points
+    row["role"] = "Batter"
+    res = compute_fpts([row])[0]
 
     expected = (
         1.0 * 3
@@ -30,4 +32,4 @@ def test_compute_batter_fpts_basic():
         + 0.2 * 5
     )
 
-    assert pytest.approx(res["fpts_batter"], rel=1e-9) == expected
+    assert pytest.approx(res["fpts"], rel=1e-9) == expected

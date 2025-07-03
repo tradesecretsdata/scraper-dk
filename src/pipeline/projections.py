@@ -95,8 +95,40 @@ def add_role_column(player_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return player_rows
 
 
+def compute_fpts(player_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Attach a general ``fpts`` projection to each row based on *role*.
+
+    • If ``role == 'Batter'`` the DraftKings scoring weights are applied using
+      the same logic as *compute_batter_fpts*.
+    • If ``role == 'Pitcher'`` the **fpts** cell is left blank (empty string)
+      for now – pitcher projections will be added in a later milestone.
+
+    The function mutates *player_rows* in-place and also *removes* any prior
+    ``fpts_batter`` key to keep the table tidy.
+    """
+
+    for row in player_rows:
+        role = str(row.get("role", "")).strip().title()
+        if role == "Batter":
+            # Compute batter fantasy points using the existing weights
+            fpts = 0.0
+            for stat, weight in _BATTER_WEIGHTS.items():
+                val = row.get(stat) if stat in row else row.get(f"{stat}_ou")
+                fpts += weight * _safe(val)
+            row["fpts"] = fpts
+        else:
+            # Placeholder for future pitcher logic
+            row["fpts"] = ""
+
+        # Drop legacy key if present
+        if "fpts_batter" in row:
+            del row["fpts_batter"]
+    return player_rows
+
+
 # __all__ for export convenience
 __all__ = [
     "compute_batter_fpts",
     "add_role_column",
+    "compute_fpts",
 ]
