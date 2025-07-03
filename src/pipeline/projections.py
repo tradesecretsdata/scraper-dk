@@ -120,7 +120,8 @@ def compute_fpts(player_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             # -- pts/$ value metric -------------------------------------
             salary = _safe(row.get("dk_salary"))
             if salary > 0:
-                row["pts/$"] = fpts / salary if salary else ""
+                # Multiply by 1000 to express points per $1000 salary (Step 11 fix)
+                row["pts/$"] = 1000 * fpts / salary
             else:
                 row["pts/$"] = ""
         else:

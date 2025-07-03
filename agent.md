@@ -16,40 +16,48 @@
 - You can find the point value that each batter statistic contributes to fpts_batter in the docstring at the top of projections.py.
 - The compute_batter_fpts() will happen in handler.py between steps 3 and 4, and that's what will be uploaded to s3 instead of the output from parse_and_pivot.
 
-4. Feature: Add triples
+4. Feature: Add triples (DONE)
 
 - Repeat the steps in item (1) but for "Triples" instead of "Home Runs"
 
-5. Fix: batter fpts
+5. Fix: batter fpts (DONE)
 
 - Batter fantasy points are not being calculated correctly because the table fields do not match the keys in \_BATTER_WEIGHTS.
 - In combine.py, let's clean up the column names. Remove the suffix '\_ou' or '\_OU' from every column name in the player_rows data.
 - In projections.py, match column name to \_BATTER_WEIGHTS key as follows: {singles: singles, doubles: doubles, triples: triples, home_runs: home_runs, rbis: rbis, runs: runs, walks_batter: walks, hit_by_pitch: hit_by_pitch, stolen_bases: stolen}
 
-6. Feature: create "role" column
+6. Feature: create "role" column (DONE)
 
 - Move the fantasy point projection computation to after the 'combine' step.
 - Create a new column "role". The value should be "Pitcher" if the players position (pos) is "SP" or "RP", and otherwise the value should be "Batter"
 
-7. Feature: Change "batter_fpts" to just "fpts"
+7. Feature: Change "batter_fpts" to just "fpts" (DONE)
 
 - Change the column name "batter_fpts" to just "fpts".
 - If the player's role is "Batter", use the existing batter_fpts logic to calculate fpts. If the player's role is "Pitcher", leave the cell empty for now; we have not built the projection logic for pitchers yet.
 
-8. Fix: clean up table
+8. Fix: clean up table (DONE)
 
 - Drop duplicate rows in the combined table.
 - Drop rows where the "slate_id" column equals 0.
 
-9. Feature: add "pts/$" column
+9. Feature: add "pts/$" column (DONE)
 
 - Add a column "pts/$" computed as "fpts" / "dk_salary"
 
-10. Fix: rename, reorder, and drop columns in the combined table
+10. Fix: rename, reorder, and drop columns in the combined table (DONE)
 
 - Do these operations before uploading to s3
 - Drop: slate_id, slate_start, playerid, game_start, player
 - Rename: {slate_start_str: slate_start, name: player, pos: position, opp: opponent, opp_sp: opponent_sp}
 - Reorder the remaining columns. Put the important stuff first, such as player, fpts, dk_salary, pts/$, position, team, opponent, opponent_sp, followed by the rest of the player descriptive information, then batter stats, then pitcher stats, and finally slate information.
 
-11. Feature: Fantasy point projections for pitchers
+11. Fix: multiply the pts/$ column by 1000 (DONE)
+
+12. Fix: Reorder stat columns
+
+- Batter columns first, then pitcher columns, in order below
+- Batter columns: singles, doubles, triples, home_runs, stolen_bases, runs, rbis, walks_batter, hit_by_pitch, hits**runs**rbis
+- Pitcher columns: earned_runs_allowed, outs_recorded, strikeouts_thrown, hits_allowed, walks_allowed
+
+13. Feature: Fantasy point projections for pitchers
