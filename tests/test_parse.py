@@ -130,3 +130,38 @@ def test_parse_triples_one_sided():
     assert row["over_american_odds"] == 700
     assert row["vig_free_over_american_odds"] > 700
     assert row["poisson_mean"] and row["poisson_mean"] > 0
+
+
+def test_parse_walks_batter_one_sided():
+    responses = {
+        "batter_props/walks_batter": {
+            "selections": [
+                {
+                    "label": "1+",
+                    "participants": [{"name": "Patient"}],
+                    "points": None,
+                    "displayOdds": {"american": "+150", "decimal": 2.5},
+                },
+                {
+                    "label": "2+",
+                    "participants": [{"name": "Patient"}],
+                    "points": None,
+                    "displayOdds": {"american": "+600", "decimal": 7.0},
+                },
+            ]
+        }
+    }
+
+    rows = parse_mod.parse_main(responses)
+    assert len(rows) == 1
+    row = rows[0]
+
+    assert row["subcategory"] == "walks_batter"
+    assert row["points"] == 0.5
+    assert row["over_american_odds"] == 150
+    # Under odds not quoted in one-sided market
+    assert row["under_american_odds"] is None
+
+    # Vig-free odds should be longer than quoted price
+    assert row["vig_free_over_american_odds"] > row["over_american_odds"]
+    assert row["poisson_mean"] and row["poisson_mean"] > 0

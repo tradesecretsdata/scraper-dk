@@ -126,7 +126,7 @@ def parse_main(payloads: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
 
             # Special-case: *Home Runs* milestones are one-sided ("1+" etc.).
             # Treat the "1+" selection as an "over" bet for a 0.5 HR line.
-            one_sided_subcats = {"home_runs", "triples"}
+            one_sided_subcats = {"home_runs", "triples", "walks_batter"}
             if subcategory in one_sided_subcats:
                 # Keep only the *1+* line – ignore 2+, 3+, … milestones
                 if label != "1+":  # label values like "1+", "2+", …

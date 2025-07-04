@@ -72,3 +72,7 @@
 - Insert to the right of the 'fpts' column.
 - Required fields for "Batter" role: singles, doubles, triples, home_runs, stolen_bases, runs, rbis, walks_batter, hit_by_pitch
 - Required fields for "Pitcher" role: earned_runs_allowed, outs_recorded, strikeouts_thrown, hits_allowed, walks_allowed
+
+16. One-sided walks (batter) market
+
+- Repeat the steps in item (1) but for "Walks (Batter)" instead of "Home Runs"
