@@ -25,6 +25,7 @@ from typing import Any, Dict, List
 from pipeline.fetch import fetch_main
 from pipeline.parse import parse_and_pivot  # ← returns bets, players
 from pipeline.projections import compute_fpts, add_role_column
+from pipeline.game_bets import extract_game_rows, build_game_index
 from utils.s3_utils import build_key, upload_csv, upload_json
 from combine import combine_main, sanitize_player_rows
 from combine import finalize_combined_rows
@@ -111,6 +112,25 @@ def lambda_handler(
 
         # 5) Combine with draftable CSVs
         combined_rows = combine_main(player_rows=player_rows, bucket=bucket)
+
+        # 5a) Extract and join game betting data (Steps 17–19)
+        game_rows = extract_game_rows(raw_payloads)
+        logger.info("Extracted %d game-betting rows", len(game_rows))
+
+        if game_rows:
+            game_idx = build_game_index(game_rows)
+            for row in combined_rows:
+                abbr = str(row.get("team"))
+                g = game_idx.get(abbr)
+                if g:
+                    # replace vig_free_spread with raw spread amount → 'spread'
+                    row["spread"] = g.get("spread_amount")
+                    row["vig_free_moneyline"] = g.get("vig_free_moneyline")
+                    row["pct_win"] = g.get("pct_win")
+
+            # ensure legacy column removed if still present
+            for row in combined_rows:
+                row.pop("vig_free_spread", None)
 
         # 5½) Assign role and compute fantasy points on *combined* rows
         combined_rows = add_role_column(combined_rows)

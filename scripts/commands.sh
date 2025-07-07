@@ -43,7 +43,7 @@ aws cloudformation deploy \
 sam build --use-container
 
 # Local invoke
-sam local invoke ScraperFunction -n env-dev.json
+sam local invoke ScraperFunction --env-vars env-dev.json
 
 # Stage invoke
 sam remote invoke ScraperFunction --config-env stage --stack-name pipeline-stage

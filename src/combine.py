@@ -262,6 +262,7 @@ def finalize_combined_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         "playerid",  # lowercase variant
         "playerId",  # camelCase variant (Step 14 fix)
         "game_start",
+        "vig_free_spread",  # obsolete after Step 20 fix
     }
 
     _PREFERRED_ORDER = [
@@ -275,6 +276,10 @@ def finalize_combined_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         "team",
         "opponent",
         "opponent_sp",
+        # ── game betting columns (Step 19 + Step 20 fix) ───────────────
+        "spread",
+        "vig_free_moneyline",
+        "pct_win",
         # ── slate metadata (Step 13 feature) ───────────────
         "game_type",
         "num_games",

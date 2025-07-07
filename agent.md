@@ -76,3 +76,20 @@
 16. One-sided walks (batter) market
 
 - Repeat the steps in item (1) but for "Walks (Batter)" instead of "Home Runs"
+
+17. Extract game betting data (DONE)
+
+- The first json that gets grabbed, "Game Lines / Game", contains betting information on each game. Extract the following information into a table: team, team_abbr (team abbreviation, e.g. MIA), opp (opponent), opp_abbr, side ("Home" or "Away"), moneyline, spread_amount (e.g. -3.5), spread_price (e.g. -171), total
+- An example of that data is located in "data/20250703T173730Z-games.json"
+
+18. Calculated columns based on game betting data (DONE)
+
+- With the data extracted in the previous item ("17. Extract game betting data"), calculate three new columns: vig_free_spread, vig_free_moneyline, and pct_win (percent chance the team wins the game, computed using vig_free_moneyline).
+
+19. Merge with combined data before the upload to s3 step (DONE)
+
+- Insert some of the new columns into the combined data table using "team" as the join key from the combined player data table and "team_abbr" from the game betting data table.
+- Columns to insert: "vig_free_spread", "vig_free_moneyline", "pct_win".
+- Insert the columns between "opponent_sp" and "game_type" in the combined data table.
+
+20. Fix: in combined data, replace "vig_free_spread" with "spread_amount" and just call that column "spread"
