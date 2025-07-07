@@ -9,11 +9,6 @@ Pitchers
         • Hit against = -0.6
         • Base on balls against = -0.6
         • Hit batsman = -0.6
-        • Complete game = 2.5 (?)
-        • Complete game shutout = 2.5 (?)
-        • No hitter = 5 = poisson probability of hit against = 0
-                ○ May not be exactly right but these last 3 don't matter much
-
 
 Batters
         • Single = 3
@@ -43,6 +38,16 @@ _BATTER_WEIGHTS: dict[str, float] = {
     "walks_batter": 2.0,
     "hit_by_pitch": 2.0,
     "stolen_bases": 5.0,
+}
+
+# Pitcher fantasy point weights (DraftKings scoring – Step 22 feature)
+_PITCHER_WEIGHTS: dict[str, float] = {
+    "innings_pitched": 2.25,
+    "strikeouts_thrown": 2.0,
+    "earned_runs_allowed": -2.0,
+    "hits_allowed": -0.6,
+    "walks_allowed": -0.6,
+    "hit_batsman": -0.6,
 }
 
 
@@ -100,8 +105,10 @@ def compute_fpts(player_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
     • If ``role == 'Batter'`` the DraftKings scoring weights are applied using
       the same logic as *compute_batter_fpts*.
-    • If ``role == 'Pitcher'`` the **fpts** cell is left blank (empty string)
-      for now – pitcher projections will be added in a later milestone.
+    • If ``role == 'Pitcher'`` the DraftKings pitcher scoring weights are
+      applied. This includes deriving *innings_pitched* from *outs_recorded*,
+      estimating *hit_batsman* from a league-average rate (0.42 per 9 IP), and
+      summing fantasy points via the weights in ``_PITCHER_WEIGHTS``.
 
     The function mutates *player_rows* in-place and also *removes* any prior
     ``fpts_batter`` key to keep the table tidy.
@@ -125,9 +132,37 @@ def compute_fpts(player_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             else:
                 row["pts/$"] = ""
         else:
-            # Placeholder for future pitcher logic
-            row["fpts"] = ""
-            row["pts/$"] = ""
+            # ── Pitcher fantasy points (Step 22) ───────────────────────
+            # 1. Derive innings pitched from outs recorded (3 outs = 1 IP)
+            outs_val = row.get("outs_recorded")
+            if outs_val in (None, ""):
+                innings_pitched = None
+            else:
+                innings_pitched = _safe(outs_val) / 3.0
+
+            # Add innings_pitched column (blank if unknown)
+            row["innings_pitched"] = (
+                round(innings_pitched, 2) if innings_pitched is not None else ""
+            )
+
+            # 2. Estimate hit batsmen based on league-average 0.42 per 9 IP
+            if innings_pitched is not None:
+                hit_batsman_val = 0.42 * innings_pitched / 9.0
+            else:
+                hit_batsman_val = None
+            row["hit_batsman"] = (
+                round(hit_batsman_val, 3) if hit_batsman_val is not None else ""
+            )
+
+            # 3. Compute pitcher fantasy points using weights
+            fpts = 0.0
+            for stat, weight in _PITCHER_WEIGHTS.items():
+                fpts += weight * _safe(row.get(stat))
+            row["fpts"] = fpts
+
+            # 4. pts/$ metric (same formula as batters)
+            salary = _safe(row.get("dk_salary"))
+            row["pts/$"] = 1000 * fpts / salary if salary > 0 else ""
 
         # ----- fpts_complete flag (Step 15) ----------------------------
         # Determine if all required stat inputs are present (non-empty)

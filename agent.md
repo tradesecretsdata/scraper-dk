@@ -92,6 +92,16 @@
 - Columns to insert: "vig_free_spread", "vig_free_moneyline", "pct_win".
 - Insert the columns between "opponent_sp" and "game_type" in the combined data table.
 
-20. Fix: in combined data, replace "vig_free_spread" with "spread_amount" and just call that column "spread".
+20. Fix: in combined data, replace "vig_free_spread" with "spread_amount" and just call that column "spread". (DONE)
 
-21. Fix: insert "total" (from game betting data) just after the "spread" column from the previous step.
+21. Fix: insert "total" (from game betting data) just after the "spread" column from the previous step. (DONE)
+
+22. Feature: Fantasy point projections for pitchers
+
+- Create a new column "innings_pitched" equal to outs_recorded/3.
+- Create a new column "hit_batsman" equal to (0.42/9)\*(innings_pitched)/9. If innings_pitched is blank (no data or player is not a pitcher) leave the cell blank.
+- Implement the pitcher fantasy points projection as outlined in the docstring in projections.py. Here is how the categories line up to columns in our table: "Innings pitched" = innings_pitched, "Strikeout" = strikeouts_thrown, "Earned run allowed" = earned_runs_allowed, "Hit against" = hits_allowed, "Base on balls against" = walks_allowed, "Hit batsman" = hit_batsman.
+
+23. Fix: the "hit_by_pitch" column should be blank for players who are pitchers.
+
+24. Fix: move the columns total_bases, hits, and hits runs rbis to the left of earned_runs_allowed (immediately following hit_by_pitch).

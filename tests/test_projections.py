@@ -38,3 +38,43 @@ def test_compute_batter_fpts_basic():
     row_with_salary = dict(row, dk_salary=5000)
     res2 = compute_fpts([row_with_salary])[0]
     assert pytest.approx(res2["pts/$"], rel=1e-9) == expected / 5000 * 1000
+
+
+# ----------------------------------------------------------------------
+# New – pitcher fantasy point projection (Step 22)
+# ----------------------------------------------------------------------
+
+
+def test_compute_pitcher_fpts_basic():
+    row = {
+        "player": "Ace",
+        "outs_recorded": 15,  # 5.0 IP
+        "strikeouts_thrown": 6,
+        "earned_runs_allowed": 2,
+        "hits_allowed": 5,
+        "walks_allowed": 2,
+        "dk_salary": 9000,
+    }
+
+    # Assign pitcher role before computing
+    row["role"] = "Pitcher"
+
+    res = compute_fpts([row])[0]
+
+    # Manual expected calculation
+    innings_pitched = 15 / 3
+    hit_batsman = 0.42 * innings_pitched / 9
+
+    expected = (
+        innings_pitched * 2.25
+        + row["strikeouts_thrown"] * 2
+        + row["earned_runs_allowed"] * -2
+        + row["hits_allowed"] * -0.6
+        + row["walks_allowed"] * -0.6
+        + hit_batsman * -0.6
+    )
+
+    assert pytest.approx(res["fpts"], rel=1e-9) == expected
+
+    expected_pts_per = expected / 9000 * 1000
+    assert pytest.approx(res["pts/$"], rel=1e-9) == expected_pts_per
