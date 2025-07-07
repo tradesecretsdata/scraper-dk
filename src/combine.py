@@ -278,6 +278,7 @@ def finalize_combined_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         "opponent_sp",
         # ── game betting columns (Step 19 + Step 20 fix) ───────────────
         "spread",
+        "total",
         "vig_free_moneyline",
         "pct_win",
         # ── slate metadata (Step 13 feature) ───────────────

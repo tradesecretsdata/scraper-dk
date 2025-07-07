@@ -125,6 +125,7 @@ def lambda_handler(
                 if g:
                     # replace vig_free_spread with raw spread amount → 'spread'
                     row["spread"] = g.get("spread_amount")
+                    row["total"] = g.get("total")
                     row["vig_free_moneyline"] = g.get("vig_free_moneyline")
                     row["pct_win"] = g.get("pct_win")
 

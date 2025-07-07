@@ -92,4 +92,6 @@
 - Columns to insert: "vig_free_spread", "vig_free_moneyline", "pct_win".
 - Insert the columns between "opponent_sp" and "game_type" in the combined data table.
 
-20. Fix: in combined data, replace "vig_free_spread" with "spread_amount" and just call that column "spread"
+20. Fix: in combined data, replace "vig_free_spread" with "spread_amount" and just call that column "spread".
+
+21. Fix: insert "total" (from game betting data) just after the "spread" column from the previous step.
