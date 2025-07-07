@@ -78,3 +78,6 @@ def test_compute_pitcher_fpts_basic():
 
     expected_pts_per = expected / 9000 * 1000
     assert pytest.approx(res["pts/$"], rel=1e-9) == expected_pts_per
+
+    # Ensure hit_by_pitch is blank for pitchers (Step 23 fix)
+    assert res["hit_by_pitch"] in ("", None)

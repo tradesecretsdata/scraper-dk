@@ -142,7 +142,7 @@ def compute_fpts(player_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
             # Add innings_pitched column (blank if unknown)
             row["innings_pitched"] = (
-                round(innings_pitched, 2) if innings_pitched is not None else ""
+                innings_pitched if innings_pitched is not None else ""
             )
 
             # 2. Estimate hit batsmen based on league-average 0.42 per 9 IP
@@ -150,15 +150,16 @@ def compute_fpts(player_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 hit_batsman_val = 0.42 * innings_pitched / 9.0
             else:
                 hit_batsman_val = None
-            row["hit_batsman"] = (
-                round(hit_batsman_val, 3) if hit_batsman_val is not None else ""
-            )
+            row["hit_batsman"] = hit_batsman_val if hit_batsman_val is not None else ""
 
             # 3. Compute pitcher fantasy points using weights
             fpts = 0.0
             for stat, weight in _PITCHER_WEIGHTS.items():
                 fpts += weight * _safe(row.get(stat))
             row["fpts"] = fpts
+
+            # Ensure 'hit_by_pitch' is blank for pitchers (Step 23 fix)
+            row["hit_by_pitch"] = ""
 
             # 4. pts/$ metric (same formula as batters)
             salary = _safe(row.get("dk_salary"))
