@@ -31,6 +31,7 @@ from pipeline.combine import (
     combine_main,
     sanitize_player_rows,
     finalize_combined_rows,
+    _PREFERRED_ORDER,
 )
 
 # ---------------------------------------------------------------------------
@@ -47,18 +48,28 @@ def _utc_stamp() -> str:
     return datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
-def _rows_to_csv(rows: List[Dict[str, Any]]) -> str:
-    """Convert list-of-dict rows → CSV string with all columns present.
+def _rows_to_csv(
+    rows: List[Dict[str, Any]],
+    *,
+    preferred_order: List[str] | None = None,
+) -> str:
+    """Convert list-of-dict *rows* to a CSV string.
 
-    The original version relied on the *first* row to define the header,
-    causing later rows that had additional keys to drop those columns – this
-    hid player-prop stats in the *combined* CSV.  We now build the header as
-    the *union* of keys across all rows, preserving order (first-seen wins).
+    The header is built as the *union* of keys across all rows.  If
+    *preferred_order* is provided, columns present in that list are ordered
+    accordingly at the front of the header while preserving their specified
+    sequence.  Any remaining columns are appended in the order they are first
+    encountered (first-seen wins). This guarantees that important columns
+    like ``hit_by_pitch`` or ``innings_pitched`` respect their desired
+    position regardless of which row happens to appear first.
     """
+
     if not rows:
         return ""
 
-    # Build ordered header union
+    # ------------------------------------------------------------------
+    # 1) Build ordered header union (first-seen wins)
+    # ------------------------------------------------------------------
     seen: set[str] = set()
     header: list[str] = []
     for r in rows:
@@ -67,6 +78,27 @@ def _rows_to_csv(rows: List[Dict[str, Any]]) -> str:
                 seen.add(k)
                 header.append(k)
 
+    # ------------------------------------------------------------------
+    # 2) Apply preferred ordering if provided
+    # ------------------------------------------------------------------
+    if preferred_order is not None:
+        ordered_header: list[str] = []
+
+        # First – columns that appear in preferred_order AND header
+        for col in preferred_order:
+            if col in header:
+                ordered_header.append(col)
+
+        # Then – any remaining columns in their existing order
+        for col in header:
+            if col not in ordered_header:
+                ordered_header.append(col)
+
+        header = ordered_header
+
+    # ------------------------------------------------------------------
+    # 3) DictWriter → CSV string
+    # ------------------------------------------------------------------
     buf = io.StringIO()
     writer = csv.DictWriter(buf, fieldnames=header, extrasaction="ignore")
     writer.writeheader()
@@ -145,7 +177,11 @@ def lambda_handler(
 
         # Now upload the combined CSV
         combined_key = build_key(proc_prefix, "combined", f"{timestamp}.csv")
-        upload_csv(_rows_to_csv(combined_rows), combined_key, bucket=bucket)
+        upload_csv(
+            _rows_to_csv(combined_rows, preferred_order=_PREFERRED_ORDER),
+            combined_key,
+            bucket=bucket,
+        )
 
         logger.info(
             "🎉 Uploaded bets → %s, players → %s, combined → %s",

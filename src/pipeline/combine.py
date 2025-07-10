@@ -33,6 +33,54 @@ logger.setLevel(logging.INFO)
 _S3 = boto3.client("s3")
 
 # ---------------------------------------------------------------------------
+# Column order shared across modules (exported as _PREFERRED_ORDER)
+# ---------------------------------------------------------------------------
+_PREFERRED_ORDER: list[str] = [
+    # ── core player info ───────────────────────────────
+    "player",
+    "fpts",
+    "fpts_complete",
+    "dk_salary",
+    "pts/$",
+    "position",
+    "team",
+    "opponent",
+    "opponent_sp",
+    # ── game betting columns (Step 19 + Step 20 fix) ───────────────
+    "spread",
+    "total",
+    "vig_free_moneyline",
+    "pct_win",
+    # ── slate metadata (Step 13 feature) ───────────────
+    "game_type",
+    "num_games",
+    "slate_start",
+    "slate_display",
+    # ── batter stats (Step 12 fix – reorder stat columns) ──
+    "singles",
+    "doubles",
+    "triples",
+    "home_runs",
+    "stolen_bases",
+    "runs",
+    "rbis",
+    "walks_batter",
+    "hit_by_pitch",
+    # new batter cumulative stats (Step 24 fix)
+    "total_bases",
+    "hits",
+    "hits__runs__rbis",
+    # ── pitcher stats ───────────────────────────────────
+    "earned_runs_allowed",
+    "outs_recorded",
+    "innings_pitched",
+    "strikeouts_thrown",
+    "hits_allowed",
+    "walks_allowed",
+    "hit_batsman",
+]
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -265,51 +313,6 @@ def finalize_combined_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         "vig_free_spread",  # obsolete after Step 20 fix
     }
 
-    _PREFERRED_ORDER = [
-        # ── core player info ───────────────────────────────
-        "player",
-        "fpts",
-        "fpts_complete",
-        "dk_salary",
-        "pts/$",
-        "position",
-        "team",
-        "opponent",
-        "opponent_sp",
-        # ── game betting columns (Step 19 + Step 20 fix) ───────────────
-        "spread",
-        "total",
-        "vig_free_moneyline",
-        "pct_win",
-        # ── slate metadata (Step 13 feature) ───────────────
-        "game_type",
-        "num_games",
-        "slate_start",
-        "slate_display",
-        # ── batter stats (Step 12 fix – reorder stat columns) ──
-        "singles",
-        "doubles",
-        "triples",
-        "home_runs",
-        "stolen_bases",
-        "runs",
-        "rbis",
-        "walks_batter",
-        "hit_by_pitch",
-        # new batter cumulative stats (Step 24 fix)
-        "total_bases",
-        "hits",
-        "hits__runs__rbis",
-        # ── pitcher stats ───────────────────────────────────
-        "earned_runs_allowed",
-        "outs_recorded",
-        "innings_pitched",
-        "strikeouts_thrown",
-        "hits_allowed",
-        "walks_allowed",
-        "hit_batsman",
-    ]
-
     for i, r in enumerate(rows):
         # ----- rename ----------------------------------------------------
         for old_key, new_key in _RENAME_MAP.items():
@@ -379,4 +382,5 @@ __all__ = [
     "combine_main",
     "clean_combined_rows",
     "finalize_combined_rows",
+    "_PREFERRED_ORDER",
 ]
