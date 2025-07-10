@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import types
 
-import combine as combine_mod
+import pipeline.combine as combine_mod
 
 # ---------------------------------------------------------------------------
 # Helpers / stubs

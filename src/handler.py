@@ -27,8 +27,11 @@ from pipeline.parse import parse_and_pivot  # ← returns bets, players
 from pipeline.projections import compute_fpts, add_role_column
 from pipeline.game_bets import extract_game_rows, build_game_index
 from utils.s3_utils import build_key, upload_csv, upload_json
-from combine import combine_main, sanitize_player_rows
-from combine import finalize_combined_rows
+from pipeline.combine import (
+    combine_main,
+    sanitize_player_rows,
+    finalize_combined_rows,
+)
 
 # ---------------------------------------------------------------------------
 # Logging
