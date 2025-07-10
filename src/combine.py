@@ -299,13 +299,15 @@ def finalize_combined_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         # new batter cumulative stats (Step 24 fix)
         "total_bases",
         "hits",
-        "hits_runs_rbis",
+        "hits__runs__rbis",
         # ── pitcher stats ───────────────────────────────────
         "earned_runs_allowed",
         "outs_recorded",
+        "innings_pitched",
         "strikeouts_thrown",
         "hits_allowed",
         "walks_allowed",
+        "hit_batsman",
     ]
 
     for i, r in enumerate(rows):
