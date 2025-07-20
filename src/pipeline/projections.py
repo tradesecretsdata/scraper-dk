@@ -197,6 +197,7 @@ def compute_fpts(player_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 "strikeouts_thrown",
                 "hits_allowed",
                 "walks_allowed",
+                "pct_pitcher_win",
             ]
 
         row["fpts_complete"] = all(
