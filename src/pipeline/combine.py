@@ -74,6 +74,7 @@ _PREFERRED_ORDER: list[str] = [
     "earned_runs_allowed",
     "outs_recorded",
     "innings_pitched",
+    "pct_pitcher_win",  # New column for win-prob-adjusted innings share
     "strikeouts_thrown",
     "hits_allowed",
     "walks_allowed",

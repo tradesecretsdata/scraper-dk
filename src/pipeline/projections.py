@@ -48,6 +48,7 @@ _PITCHER_WEIGHTS: dict[str, float] = {
     "hits_allowed": -0.6,
     "walks_allowed": -0.6,
     "hit_batsman": -0.6,
+    "pct_pitcher_win": 4.0,  # New: win probability contribution (Step 25)
 }
 
 
@@ -151,6 +152,16 @@ def compute_fpts(player_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             else:
                 hit_batsman_val = None
             row["hit_batsman"] = hit_batsman_val if hit_batsman_val is not None else ""
+
+            # 2b. Calculate pitcher win probability component (Step 25)
+            pct_win_val = row.get("pct_win")
+            if innings_pitched is not None and pct_win_val not in (None, ""):
+                pct_pitcher_win_val = _safe(pct_win_val) * innings_pitched / 9.0
+            else:
+                pct_pitcher_win_val = None
+            row["pct_pitcher_win"] = (
+                pct_pitcher_win_val if pct_pitcher_win_val is not None else ""
+            )
 
             # 3. Compute pitcher fantasy points using weights
             fpts = 0.0
