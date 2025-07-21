@@ -172,6 +172,61 @@ def lambda_handler(
         combined_rows = add_role_column(combined_rows)
         combined_rows = compute_fpts(combined_rows)
 
+        # 5⅝) Add pitcher win probability component and adjust fpts (Step 25)
+        def _safe(val: Any) -> float:
+            try:
+                return float(val) if val not in (None, "") else 0.0
+            except (TypeError, ValueError):
+                return 0.0
+
+        for row in combined_rows:
+            role = str(row.get("role", "")).strip().title()
+            if role == "Pitcher":
+                # Compute innings pitched (already present or derive)
+                ip_val = row.get("innings_pitched")
+                if ip_val in (None, ""):
+                    outs_val = row.get("outs_recorded")
+                    ip = _safe(outs_val) / 3.0 if outs_val not in (None, "") else None
+                else:
+                    ip = _safe(ip_val)
+
+                pct_win = row.get("pct_win")
+                if ip is not None and pct_win not in (None, ""):
+                    pct_pitcher_win = _safe(pct_win) * ip / 9.0
+                else:
+                    pct_pitcher_win = None
+
+                row["pct_pitcher_win"] = (
+                    pct_pitcher_win if pct_pitcher_win is not None else ""
+                )
+
+                # Add to fantasy points (4 pts per win probability share)
+                fpts_before = _safe(row.get("fpts"))
+                fpts_after = fpts_before + 4.0 * _safe(pct_pitcher_win)
+                row["fpts"] = fpts_after
+
+                # Recalculate pts/$ if salary available
+                salary = _safe(row.get("dk_salary"))
+                if salary > 0:
+                    row["pts/$"] = 1000 * fpts_after / salary
+
+                # Update fpts_complete (now requires pct_pitcher_win)
+                required_fields = [
+                    "earned_runs_allowed",
+                    "outs_recorded",
+                    "strikeouts_thrown",
+                    "hits_allowed",
+                    "walks_allowed",
+                    "pct_pitcher_win",
+                ]
+                row["fpts_complete"] = all(
+                    row.get(fld) not in (None, "") for fld in required_fields
+                )
+            else:
+                # Ensure column exists for batters to retain CSV header
+                if "pct_pitcher_win" not in row:
+                    row["pct_pitcher_win"] = ""
+
         # 5¾) Final column cleanup (rename/drop/order)
         combined_rows = finalize_combined_rows(combined_rows)
 
