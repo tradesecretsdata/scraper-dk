@@ -98,6 +98,8 @@ def fetch_main() -> Dict[str, Dict[str, Any]]:
         raise KeyError(f"{league_name!r} not found in dk-api.yaml")
 
     payloads: dict[str, dict[str, Any]] = {}
+    # Track endpoints that failed (HTTP error) or returned an empty payload
+    failed_endpoints: list[str] = []
     league = api_map[league_name]
     event_group_id = league["eventGroupId"]
 
@@ -127,16 +129,44 @@ def fetch_main() -> Dict[str, Dict[str, Any]]:
             try:
                 r = sess.get(url)
                 r.raise_for_status()
-                print(f"✅ GET OK: {category_name} / {subcat_name}")
+
+                data = r.json()
+
+                # Determine if the payload contains usable data. We treat it as
+                # *empty* when none of the common DraftKings keys are present
+                # or all of them are empty sequences.
+                has_selections = bool(data.get("selections"))
+                has_events = bool(data.get("events"))
+                has_markets = bool(data.get("markets"))
+
+                if not (has_selections or has_events or has_markets):
+                    # 200 OK, but nothing to work with → mark as failed
+                    print(f"❌ 200 OK – empty payload: {category_name} / {subcat_name}")
+                    failed_endpoints.append(f"{category_name} / {subcat_name} (empty)")
+                else:
+                    print(f"✅ GET OK: {category_name} / {subcat_name}")
+
+                # Store payload regardless so downstream steps keep the full map
+                payloads[f"{cat_slug}/{subcat_slug}"] = data
+
             except requests.RequestException as exc:
-                print(f"   ! Request failed: {exc}")
+                print(f"❌ Request failed: {category_name} / {subcat_name} – {exc}")
+                failed_endpoints.append(f"{category_name} / {subcat_name} (HTTP error)")
                 print(f"sleeping for {delay:.1f} seconds")
                 time.sleep(delay)
                 continue
 
-            payloads[f"{cat_slug}/{subcat_slug}"] = r.json()
-
             print(f"sleeping for {delay:.1f} seconds")
             time.sleep(delay)
+
+    # ------------------------------------------------------------------
+    # Final summary of any failures / empty responses
+    # ------------------------------------------------------------------
+    if failed_endpoints:
+        print("\n❌ Summary – endpoints with errors or no data:")
+        for ep in failed_endpoints:
+            print(f"   ❌ {ep}")
+    else:
+        print("\n✅ All endpoints returned data.")
 
     return payloads
