@@ -96,12 +96,18 @@
 
 21. Fix: insert "total" (from game betting data) just after the "spread" column from the previous step. (DONE)
 
-22. Feature: Fantasy point projections for pitchers
+22. Feature: Fantasy point projections for pitchers (DONE)
 
 - Create a new column "innings_pitched" equal to outs_recorded/3.
 - Create a new column "hit_batsman" equal to (0.42/9)\*(innings_pitched)/9. If innings_pitched is blank (no data or player is not a pitcher) leave the cell blank.
 - Implement the pitcher fantasy points projection as outlined in the docstring in projections.py. Here is how the categories line up to columns in our table: "Innings pitched" = innings_pitched, "Strikeout" = strikeouts_thrown, "Earned run allowed" = earned_runs_allowed, "Hit against" = hits_allowed, "Base on balls against" = walks_allowed, "Hit batsman" = hit_batsman.
 
-23. Fix: the "hit_by_pitch" column should be blank for players who are pitchers.
+23. Fix: the "hit_by_pitch" column should be blank for players who are pitchers. (DONE)
 
-24. Fix: move the columns total_bases, hits, and hits runs rbis to the left of earned_runs_allowed (immediately following hit_by_pitch).
+24. Fix: move the columns total_bases, hits, and hits runs rbis to the left of earned_runs_allowed (immediately following hit_by_pitch). (DONE)
+
+25. Fix: fpts_complete for pitchers is showing False even though it seems all fields are present. Is one of the fields being filled after fpts_complete = false is determined? Figure out what is going wrong and fix it. (DONE)
+
+26. Feature: fill in empty stolen_bases (for batters only) with 0. (DONE)
+
+27. Feature: fill in empty walks_batter (for batters) with equation: walks_batter = 5e-5 \* dk_salary + 0.1806. This must be done after props data is combined with salary data. (DONE)
