@@ -117,6 +117,9 @@ def compute_fpts(player_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     for row in player_rows:
         role = str(row.get("role", "")).strip().title()
         if role == "Batter":
+            # ── Step 26: ensure stolen_bases defaults to 0 for batters ──
+            if row.get("stolen_bases") in (None, ""):
+                row["stolen_bases"] = 0.0
             # Compute batter fantasy points using the existing weights
             fpts = 0.0
             for stat, weight in _BATTER_WEIGHTS.items():
