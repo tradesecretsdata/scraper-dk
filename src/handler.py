@@ -107,6 +107,25 @@ def _rows_to_csv(
 
 
 # ---------------------------------------------------------------------------
+# Team-abbreviation aliases (DraftKings CSV ↔ Game Lines JSON)
+# ---------------------------------------------------------------------------
+# Certain teams use different 3-letter codes across endpoints.
+# Define a *central* mapping so we can resolve these differences
+# when joining game-level betting data (vig-free moneyline, etc.).
+#   – Keys correspond to abbreviations found in **contest CSVs**
+#   – Values map to the corresponding ``shortName`` in game_lines
+#     payloads.
+#
+# Expand this dict as new discrepancies are discovered.
+_TEAM_ABBR_ALIASES: dict[str, str] = {
+    # Oakland Athletics – DraftKings uses "ATH"; game payload uses "A's"
+    "ATH": "A's",
+    # Washington Nationals – DraftKings uses "WSH"; game payload uses "WAS"
+    "WSH": "WAS",
+}
+
+
+# ---------------------------------------------------------------------------
 # Lambda handler
 # ---------------------------------------------------------------------------
 
@@ -156,7 +175,22 @@ def lambda_handler(
             game_idx = build_game_index(game_rows)
             for row in combined_rows:
                 abbr = str(row.get("team"))
+                # ------------------------------------------------------------------
+                # 1) Direct lookup on the raw abbreviation (most common case)
+                # ------------------------------------------------------------------
                 g = game_idx.get(abbr)
+
+                # ------------------------------------------------------------------
+                # 2) Fallback – try alias if direct lookup failed
+                # ------------------------------------------------------------------
+                if g is None:
+                    alias = _TEAM_ABBR_ALIASES.get(abbr)
+                    if alias:
+                        g = game_idx.get(alias)
+
+                # ------------------------------------------------------------------
+                # 3) Apply betting columns if match found
+                # ------------------------------------------------------------------
                 if g:
                     # replace vig_free_spread with raw spread amount → 'spread'
                     row["spread"] = g.get("spread_amount")
