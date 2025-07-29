@@ -122,6 +122,8 @@ _TEAM_ABBR_ALIASES: dict[str, str] = {
     "ATH": "A's",
     # Washington Nationals – DraftKings uses "WSH"; game payload uses "WAS"
     "WSH": "WAS",
+    # San Francisco Giants – DraftKings uses "SF"; game payload uses "SFG"
+    "SF": "SFG",
 }
 
 
