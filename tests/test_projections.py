@@ -20,7 +20,7 @@ def test_compute_batter_fpts_basic():
     row["role"] = "Batter"
     res = compute_fpts([row])[0]
 
-    expected = (
+    base_expected = (
         1.0 * 3
         + 0.5 * 5
         + 0.1 * 8
@@ -31,6 +31,8 @@ def test_compute_batter_fpts_basic():
         + 0.04 * 2
         + 0.2 * 5
     )
+
+    expected = base_expected * 0.938  # Step 29 scaling for batters
 
     assert pytest.approx(res["fpts"], rel=1e-9) == expected
 
@@ -65,7 +67,7 @@ def test_compute_pitcher_fpts_basic():
     innings_pitched = 15 / 3
     hit_batsman = 0.42 * innings_pitched / 9
 
-    expected = (
+    base_expected = (
         innings_pitched * 2.25
         + row["strikeouts_thrown"] * 2
         + row["earned_runs_allowed"] * -2
@@ -73,6 +75,8 @@ def test_compute_pitcher_fpts_basic():
         + row["walks_allowed"] * -0.6
         + hit_batsman * -0.6
     )
+
+    expected = base_expected * 0.941  # Step 29 scaling for pitchers
 
     assert pytest.approx(res["fpts"], rel=1e-9) == expected
 

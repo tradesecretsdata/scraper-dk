@@ -126,11 +126,18 @@ def compute_fpts(player_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 salary_val = _safe(row.get("dk_salary"))
                 if salary_val > 0:
                     row["walks_batter"] = 5e-5 * salary_val + 0.1806
+
+            # ── Step 28: fill missing triples with default 0.01 ──
+            if row.get("triples") in (None, ""):
+                row["triples"] = 0.01
             # Compute batter fantasy points using the existing weights
             fpts = 0.0
             for stat, weight in _BATTER_WEIGHTS.items():
                 val = row.get(stat) if stat in row else row.get(f"{stat}_ou")
                 fpts += weight * _safe(val)
+
+            # ── Step 29: apply Batter scaling factor (0.938) ──
+            fpts *= 0.938
             row["fpts"] = fpts
 
             # -- pts/$ value metric -------------------------------------
@@ -165,6 +172,9 @@ def compute_fpts(player_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             fpts = 0.0
             for stat, weight in _PITCHER_WEIGHTS.items():
                 fpts += weight * _safe(row.get(stat))
+
+            # ── Step 29: apply Pitcher scaling factor (0.941) ──
+            fpts *= 0.941
             row["fpts"] = fpts
 
             # Ensure 'hit_by_pitch' is blank for pitchers (Step 23 fix)

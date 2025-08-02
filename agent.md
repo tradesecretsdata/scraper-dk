@@ -111,3 +111,7 @@
 26. Feature: fill in empty stolen_bases (for batters only) with 0. (DONE)
 
 27. Feature: fill in empty walks_batter (for batters) with equation: walks_batter = 5e-5 \* dk_salary + 0.1806. This must be done after props data is combined with salary data. (DONE)
+
+28. Feature: fill in empty triples (for batters) with 0.01. Be sure to put this before 'fpts_complete' logic because the value of fpts_complete depends on whether 'triples' is empty.
+
+29. Feature: scale down projections. Before uploading combined data, but after applying other adjustments to 'fpts', if 'role' = "Pitcher", multiply 'fpts' by 0.941. If 'role' = "Batter", multiply 'fpts' by 0.938.
