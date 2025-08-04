@@ -195,14 +195,17 @@ def lambda_handler(
                 # ------------------------------------------------------------------
                 if g:
                     # replace vig_free_spread with raw spread amount → 'spread'
-                    row["spread"] = g.get("spread_amount")
-                    row["total"] = g.get("total")
+                    row["team_total"] = g.get("team_total")
+                    row["opp_total"] = g.get("opp_total")
                     row["vig_free_moneyline"] = g.get("vig_free_moneyline")
                     row["pct_win"] = g.get("pct_win")
 
             # ensure legacy column removed if still present
             for row in combined_rows:
                 row.pop("vig_free_spread", None)
+                # remove legacy spread/total keys if still present
+                row.pop("spread", None)
+                row.pop("total", None)
 
         # 5½) Assign role and compute fantasy points on *combined* rows
         combined_rows = add_role_column(combined_rows)
@@ -218,19 +221,33 @@ def lambda_handler(
         for row in combined_rows:
             role = str(row.get("role", "")).strip().title()
             if role == "Pitcher":
-                # Compute innings pitched (already present or derive)
-                ip_val = row.get("innings_pitched")
-                if ip_val in (None, ""):
-                    outs_val = row.get("outs_recorded")
-                    ip = _safe(outs_val) / 3.0 if outs_val not in (None, "") else None
-                else:
-                    ip = _safe(ip_val)
+                # ------------------------------------------------------------------
+                # Preferred win-prob source: *to_record_a_win* pitcher prop (Step 30)
+                # Fallback: scale team win probability by innings share (legacy)
+                # ------------------------------------------------------------------
 
-                pct_win = row.get("pct_win")
-                if ip is not None and pct_win not in (None, ""):
-                    pct_pitcher_win = _safe(pct_win) * ip / 9.0
+                trw_val = row.get("to_record_a_win")
+                if trw_val not in (None, ""):
+                    pct_pitcher_win = _safe(trw_val)
                 else:
-                    pct_pitcher_win = None
+                    # ----- fallback (legacy) --------------------------------------
+                    # Compute innings pitched
+                    ip_val = row.get("innings_pitched")
+                    if ip_val in (None, ""):
+                        outs_val = row.get("outs_recorded")
+                        ip = (
+                            _safe(outs_val) / 3.0
+                            if outs_val not in (None, "")
+                            else None
+                        )
+                    else:
+                        ip = _safe(ip_val)
+
+                    team_win_pct = row.get("pct_win")
+                    if ip is not None and team_win_pct not in (None, ""):
+                        pct_pitcher_win = _safe(team_win_pct) * ip / 9.0
+                    else:
+                        pct_pitcher_win = None
 
                 row["pct_pitcher_win"] = (
                     pct_pitcher_win if pct_pitcher_win is not None else ""

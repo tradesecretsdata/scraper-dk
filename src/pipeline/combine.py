@@ -46,9 +46,9 @@ _PREFERRED_ORDER: list[str] = [
     "team",
     "opponent",
     "opponent_sp",
-    # ── game betting columns (Step 19 + Step 20 fix) ───────────────
-    "spread",
-    "total",
+    # ── game betting columns (updated Step 31) ───────────────
+    "team_total",
+    "opp_total",
     "vig_free_moneyline",
     "pct_win",
     # ── slate metadata (Step 13 feature) ───────────────
@@ -312,6 +312,8 @@ def finalize_combined_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         "playerId",  # camelCase variant (Step 14 fix)
         "game_start",
         "vig_free_spread",  # obsolete after Step 20 fix
+        "spread",  # obsolete after Step 31
+        "total",  # obsolete after Step 31
     }
 
     for i, r in enumerate(rows):

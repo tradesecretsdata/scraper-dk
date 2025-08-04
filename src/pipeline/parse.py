@@ -123,6 +123,10 @@ def parse_main(payloads: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
 
         for sel in payload["selections"]:
             label = str(sel.get("label", "")).lower()
+            # Normalize label variants for two-way markets
+            if label in {"yes", "no"}:
+                # Map to canonical over/under tokens so grouping logic works
+                label = "over" if label == "yes" else "under"
 
             # Special-case: *Home Runs* milestones are one-sided ("1+" etc.).
             # Treat the "1+" selection as an "over" bet for a 0.5 HR line.
@@ -191,6 +195,9 @@ def parse_main(payloads: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
 
             player = sel.get("participants", [{}])[0].get("name")
             points = sel.get("points")
+            # For pitcher win prop – no points value; treat as 0
+            if subcategory == "to_record_a_win":
+                points = None
 
             g = groups.setdefault(
                 (player, points), {"player": player, "points": points}
@@ -213,10 +220,14 @@ def parse_main(payloads: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
             vf_under_amer = _decimal_to_american(vf_under_dec)
 
             p_over_vf = _american_to_prob(vf_over_amer)
-            k_floor = int(math.floor(points)) if points is not None else 0
-            poisson_mean = (
-                _solve_lambda(k_floor, p_over_vf) if p_over_vf is not None else None
-            )
+            if subcategory == "to_record_a_win":
+                # For win-prop markets, store probability rather than poisson λ
+                poisson_mean = p_over_vf
+            else:
+                k_floor = int(math.floor(points)) if points is not None else 0
+                poisson_mean = (
+                    _solve_lambda(k_floor, p_over_vf) if p_over_vf is not None else None
+                )
 
             rows.append(
                 {

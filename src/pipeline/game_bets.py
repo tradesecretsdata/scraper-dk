@@ -138,11 +138,23 @@ def extract_game_rows(payloads: Mapping[str, Dict[str, Any]]) -> List[Dict[str, 
             money_q = home_price_ml if is_home else away_price_ml
             vf_money = vf_home_ml if is_home else vf_away_ml
 
-            spread_q = home_spread_price if is_home else away_spread_price
-            spread_amt = home_spread_amt if is_home else away_spread_amt
-            vf_spread = vf_home_spread if is_home else vf_away_spread
-
             pct_win = _american_to_prob(vf_money) if vf_money is not None else None
+
+            # ──────────────────────────────────────────────────────────
+            # Compute team / opponent run totals via Pythagorean expectation
+            #   P(win) = R^z / (R^z + O^z) with z = 1.83
+            #   R + O = total_pts
+            #   Solve for R (team runs). Opp runs = total_pts - R.
+            # ──────────────────────────────────────────────────────────
+            team_total = opp_total = None
+            if pct_win is not None and total_pts not in (None, 0):
+                try:
+                    z = 1.83
+                    ratio = (pct_win / (1.0 - pct_win)) ** (1.0 / z)
+                    team_total = total_pts * ratio / (1.0 + ratio)
+                    opp_total = total_pts / (1.0 + ratio)
+                except (ZeroDivisionError, ValueError):
+                    team_total = opp_total = None
 
             return {
                 "event_id": event_id,
@@ -153,13 +165,11 @@ def extract_game_rows(payloads: Mapping[str, Dict[str, Any]]) -> List[Dict[str, 
                 "side": "Home" if is_home else "Away",
                 # quoted lines
                 "moneyline": money_q,
-                "spread_amount": spread_amt,
-                "spread_price": spread_q,
-                "total": total_pts,
-                # derived columns (Step 18)
+                # derived columns
                 "vig_free_moneyline": vf_money,
-                "vig_free_spread": vf_spread,
                 "pct_win": pct_win,
+                "team_total": team_total,
+                "opp_total": opp_total,
             }
 
         rows.append(_build_row("home"))

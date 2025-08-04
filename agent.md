@@ -112,6 +112,10 @@
 
 27. Feature: fill in empty walks_batter (for batters) with equation: walks_batter = 5e-5 \* dk_salary + 0.1806. This must be done after props data is combined with salary data. (DONE)
 
-28. Feature: fill in empty triples (for batters) with 0.01. Be sure to put this before 'fpts_complete' logic because the value of fpts_complete depends on whether 'triples' is empty.
+28. Feature: fill in empty triples (for batters) with 0.01. Be sure to put this before 'fpts_complete' logic because the value of fpts_complete depends on whether 'triples' is empty. (DONE)
 
-29. Feature: scale down projections. Before uploading combined data, but after applying other adjustments to 'fpts', if 'role' = "Pitcher", multiply 'fpts' by 0.941. If 'role' = "Batter", multiply 'fpts' by 0.938.
+29. Feature: scale down projections. Before uploading combined data, but after applying other adjustments to 'fpts', if 'role' = "Pitcher", multiply 'fpts' by 0.941. If 'role' = "Batter", multiply 'fpts' by 0.938. (DONE)
+
+30. Feature: Instead of computing pct_pitcher_win from the team's moneyline, use the two-way prop market "to_record_a_win" from "pitcher_props". Compute the vig-free odds of a win and convert it to a percentage. See file "to_record_a_win_temp" for an example of the raw data.
+
+31. Feature: replace 'spread' and 'total' columns with 'team_total' and 'opp_total'. Plug the vig-free moneyline and game total into pythagorian expectation with exponent 1.83 to compute the run totals (team_total and opp_total) for the game.
