@@ -122,7 +122,11 @@ def compute_fpts(player_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 row["stolen_bases"] = 0.0
 
             # ── Step 27: back-fill walks_batter based on salary ──
-            if row.get("walks_batter") in (None, ""):
+            # Only when neither explicit value nor *_ou is provided
+            if row.get("walks_batter") in (None, "") and row.get("walks_batter_ou") in (
+                None,
+                "",
+            ):
                 salary_val = _safe(row.get("dk_salary"))
                 if salary_val > 0:
                     row["walks_batter"] = 5e-5 * salary_val + 0.1806
