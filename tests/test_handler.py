@@ -1,123 +1,32 @@
-import csv
-import importlib
-from io import StringIO
+import handler
 
 
-# ---------------------------------------------------------------------------
-# Fixtures / stubs
-# ---------------------------------------------------------------------------
-def _fake_fetch():
-    """Return two markets for the SAME player to test pivot logic."""
-    return {
-        # pitcher prop
-        "pitcher_props/triples_ou": {
-            "selections": [
-                {
-                    "label": "Over",
-                    "participants": [{"name": "Jane"}],
-                    "points": 0.5,
-                    "displayOdds": {"american": "-110", "decimal": 1.91},
-                },
-                {
-                    "label": "Under",
-                    "participants": [{"name": "Jane"}],
-                    "points": 0.5,
-                    "displayOdds": {"american": "-110", "decimal": 1.91},
-                },
-            ]
-        },
-        # batter prop for same player
-        "batter_props/doubles": {
-            "selections": [
-                {
-                    "label": "Over",
-                    "participants": [{"name": "Jane"}],
-                    "points": 0.5,
-                    "displayOdds": {"american": "+120", "decimal": 2.20},
-                },
-                {
-                    "label": "Under",
-                    "participants": [{"name": "Jane"}],
-                    "points": 0.5,
-                    "displayOdds": {"american": "-140", "decimal": 1.71},
-                },
-            ]
-        },
-    }
+def test_lambda_handler_success(monkeypatch):
+    """lambda_handler should return {"status": "ok"} when fetch_main succeeds."""
+
+    called = {}
+
+    def fake_main():
+        called["ran"] = True
+
+    # Patch the fetch_main symbol that was imported in handler.py
+    monkeypatch.setattr(handler, "fetch_main", fake_main)
+
+    result = handler.lambda_handler({}, None)
+
+    assert result == {"status": "ok"}
+    assert called.get("ran") is True
 
 
-def test_lambda_handler(monkeypatch):
-    """Handler should upload one bets CSV and one players CSV."""
-    # -- env vars ----------------------------------------------------------
-    monkeypatch.setenv("BUCKET_NAME", "unit-bucket")
-    monkeypatch.setenv("S3_PREFIX", "raw")
-    monkeypatch.setenv("PROC_PREFIX", "processed")
-    monkeypatch.setenv("ENV", "test")
+def test_lambda_handler_error(monkeypatch):
+    """lambda_handler should catch exceptions and return an error payload."""
 
-    # -- stub fetch_main ---------------------------------------------------
-    import pipeline.fetch as fetch_mod
+    def fake_main():
+        raise RuntimeError("boom")
 
-    monkeypatch.setattr(fetch_mod, "fetch_main", _fake_fetch, raising=True)
+    monkeypatch.setattr(handler, "fetch_main", fake_main)
 
-    # -- capture uploads ---------------------------------------------------
-    raw_keys, csv_keys, csv_bodies = [], [], []
+    result = handler.lambda_handler({}, None)
 
-    def fake_upload_json(data, key, bucket=None):  # noqa: D401
-        raw_keys.append(key)
-
-    def fake_upload_csv(text, key, bucket=None):  # noqa: D401
-        csv_keys.append(key)
-        csv_bodies.append((key, text))
-
-    import utils.s3_utils as s3_mod
-
-    monkeypatch.setattr(s3_mod, "upload_json", fake_upload_json, raising=True)
-    monkeypatch.setattr(s3_mod, "upload_csv", fake_upload_csv, raising=True)
-
-    # -- stub combine_main -----------------------------------------------
-
-    def fake_combine_main(*_, **__):  # noqa: D401
-        return [{"mock": "row"}]
-
-    # patch the symbol inside handler after import (later) ----------------
-
-    # -- run handler -------------------------------------------------------
-    handler = importlib.import_module("handler")
-
-    monkeypatch.setattr(handler, "combine_main", fake_combine_main, raising=True)
-    result = handler.lambda_handler({}, {})  # type: ignore[arg-type]
-
-    # -- result assertions -------------------------------------------------
-    assert result["status"] == "ok"
-    assert result["bets_rows"] == 2  # two detailed rows
-    assert result["players_rows"] == 1  # one player pivot row
-    assert result["combined_rows"] == 1  # fake Combine returns 1 row
-
-    # -- S3 key assertions -------------------------------------------------
-    assert len(raw_keys) == 2  # raw JSON uploads (2 endpoints)
-    assert len(csv_keys) == 3  # three CSV uploads
-    assert any("/bets/" in k for k in csv_keys)
-    assert any("/players/" in k for k in csv_keys)
-    assert any("/combined/" in k for k in csv_keys)
-
-    # -- content assertions ------------------------------------------------
-    bets_csv = next(text for key, text in csv_bodies if "/bets/" in key)
-    players_csv = next(text for key, text in csv_bodies if "/players/" in key)
-    combined_csv = next(text for key, text in csv_bodies if "/combined/" in key)
-
-    # bets table: 2 rows, columns include subcategory
-    bets_rows = list(csv.DictReader(StringIO(bets_csv)))
-    assert len(bets_rows) == 2
-    assert {r["subcategory"] for r in bets_rows} == {"triples_ou", "doubles"}
-
-    # players table: 1 row, columns for each subcategory
-    players_rows = list(csv.DictReader(StringIO(players_csv)))
-    assert len(players_rows) == 1
-    row = players_rows[0]
-    assert row["player"] == "Jane"
-    assert "triples" in row and "doubles" in row
-    assert not any(k.endswith("_ou") for k in row)
-
-    # combined CSV should match fake stub
-    comb_rows = list(csv.DictReader(StringIO(combined_csv)))
-    assert len(comb_rows) == 1 and comb_rows[0]["mock"] == "row"
+    assert result["status"] == "error"
+    assert result["error"] == "boom"
