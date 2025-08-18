@@ -15,4 +15,3 @@ samconfig.local.toml
 *.crt
 playground/
 oxylabs.json
-data/
