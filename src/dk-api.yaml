@@ -47,6 +47,10 @@ mlb:
           subCategoryId: 17411
         "Triples O/U":
           subCategoryId: 17439
+        "Triples":
+          subCategoryId: 17847
+        "Walks (Batter)":
+          subCategoryId: 17848
     "Pitcher Props":
       categoryId: 1031
       subcategories:
