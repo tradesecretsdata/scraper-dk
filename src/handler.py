@@ -24,8 +24,15 @@ from typing import Any, Dict, List
 
 from pipeline.fetch import fetch_main
 from pipeline.parse import parse_and_pivot  # ← returns bets, players
+from pipeline.projections import compute_fpts, add_role_column
+from pipeline.game_bets import extract_game_rows, build_game_index
 from utils.s3_utils import build_key, upload_csv, upload_json
-from combine import combine_main
+from pipeline.combine import (
+    combine_main,
+    sanitize_player_rows,
+    finalize_combined_rows,
+    _PREFERRED_ORDER,
+)
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -41,16 +48,83 @@ def _utc_stamp() -> str:
     return datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
-def _rows_to_csv(rows: List[Dict[str, Any]]) -> str:
-    """Convert list-of-dict rows → CSV string."""
+def _rows_to_csv(
+    rows: List[Dict[str, Any]],
+    *,
+    preferred_order: List[str] | None = None,
+) -> str:
+    """Convert list-of-dict *rows* to a CSV string.
+
+    The header is built as the *union* of keys across all rows.  If
+    *preferred_order* is provided, columns present in that list are ordered
+    accordingly at the front of the header while preserving their specified
+    sequence.  Any remaining columns are appended in the order they are first
+    encountered (first-seen wins). This guarantees that important columns
+    like ``hit_by_pitch`` or ``innings_pitched`` respect their desired
+    position regardless of which row happens to appear first.
+    """
+
     if not rows:
         return ""
-    header = list(rows[0])
+
+    # ------------------------------------------------------------------
+    # 1) Build ordered header union (first-seen wins)
+    # ------------------------------------------------------------------
+    seen: set[str] = set()
+    header: list[str] = []
+    for r in rows:
+        for k in r.keys():
+            if k not in seen:
+                seen.add(k)
+                header.append(k)
+
+    # ------------------------------------------------------------------
+    # 2) Apply preferred ordering if provided
+    # ------------------------------------------------------------------
+    if preferred_order is not None:
+        ordered_header: list[str] = []
+
+        # First – columns that appear in preferred_order AND header
+        for col in preferred_order:
+            if col in header:
+                ordered_header.append(col)
+
+        # Then – any remaining columns in their existing order
+        for col in header:
+            if col not in ordered_header:
+                ordered_header.append(col)
+
+        header = ordered_header
+
+    # ------------------------------------------------------------------
+    # 3) DictWriter → CSV string
+    # ------------------------------------------------------------------
     buf = io.StringIO()
     writer = csv.DictWriter(buf, fieldnames=header, extrasaction="ignore")
     writer.writeheader()
     writer.writerows(rows)
     return buf.getvalue()
+
+
+# ---------------------------------------------------------------------------
+# Team-abbreviation aliases (DraftKings CSV ↔ Game Lines JSON)
+# ---------------------------------------------------------------------------
+# Certain teams use different 3-letter codes across endpoints.
+# Define a *central* mapping so we can resolve these differences
+# when joining game-level betting data (vig-free moneyline, etc.).
+#   – Keys correspond to abbreviations found in **contest CSVs**
+#   – Values map to the corresponding ``shortName`` in game_lines
+#     payloads.
+#
+# Expand this dict as new discrepancies are discovered.
+_TEAM_ABBR_ALIASES: dict[str, str] = {
+    # Oakland Athletics – DraftKings uses "ATH"; game payload uses "A's"
+    "ATH": "A's",
+    # Washington Nationals – DraftKings uses "WSH"; game payload uses "WAS"
+    "WSH": "WAS",
+    # San Francisco Giants – DraftKings uses "SF"; game payload uses "SFG"
+    "SF": "SFG",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -82,6 +156,9 @@ def lambda_handler(
         bet_rows, player_rows = parse_and_pivot(raw_payloads)
         logger.info("Parsed bets=%d  players=%d", len(bet_rows), len(player_rows))
 
+        # 3½) Normalize column names (no fantasy point projections here – moved after combine)
+        player_rows = sanitize_player_rows(player_rows)
+
         # 4) Upload processed CSVs (bets / players)
         bets_key = build_key(proc_prefix, "bets", f"{timestamp}.csv")
         players_key = build_key(proc_prefix, "players", f"{timestamp}.csv")
@@ -91,8 +168,128 @@ def lambda_handler(
 
         # 5) Combine with draftable CSVs
         combined_rows = combine_main(player_rows=player_rows, bucket=bucket)
+
+        # 5a) Extract and join game betting data (Steps 17–19)
+        game_rows = extract_game_rows(raw_payloads)
+        logger.info("Extracted %d game-betting rows", len(game_rows))
+
+        if game_rows:
+            game_idx = build_game_index(game_rows)
+            for row in combined_rows:
+                abbr = str(row.get("team"))
+                # ------------------------------------------------------------------
+                # 1) Direct lookup on the raw abbreviation (most common case)
+                # ------------------------------------------------------------------
+                g = game_idx.get(abbr)
+
+                # ------------------------------------------------------------------
+                # 2) Fallback – try alias if direct lookup failed
+                # ------------------------------------------------------------------
+                if g is None:
+                    alias = _TEAM_ABBR_ALIASES.get(abbr)
+                    if alias:
+                        g = game_idx.get(alias)
+
+                # ------------------------------------------------------------------
+                # 3) Apply betting columns if match found
+                # ------------------------------------------------------------------
+                if g:
+                    # replace vig_free_spread with raw spread amount → 'spread'
+                    row["team_total"] = g.get("team_total")
+                    row["opp_total"] = g.get("opp_total")
+                    row["vig_free_moneyline"] = g.get("vig_free_moneyline")
+                    row["pct_win"] = g.get("pct_win")
+
+            # ensure legacy column removed if still present
+            for row in combined_rows:
+                row.pop("vig_free_spread", None)
+                # remove legacy spread/total keys if still present
+                row.pop("spread", None)
+                row.pop("total", None)
+
+        # 5½) Assign role and compute fantasy points on *combined* rows
+        combined_rows = add_role_column(combined_rows)
+        combined_rows = compute_fpts(combined_rows)
+
+        # 5⅝) Add pitcher win probability component and adjust fpts (Step 25)
+        def _safe(val: Any) -> float:
+            try:
+                return float(val) if val not in (None, "") else 0.0
+            except (TypeError, ValueError):
+                return 0.0
+
+        for row in combined_rows:
+            role = str(row.get("role", "")).strip().title()
+            if role == "Pitcher":
+                # ------------------------------------------------------------------
+                # Preferred win-prob source: *to_record_a_win* pitcher prop (Step 30)
+                # Fallback: scale team win probability by innings share (legacy)
+                # ------------------------------------------------------------------
+
+                trw_val = row.get("to_record_a_win")
+                if trw_val not in (None, ""):
+                    pct_pitcher_win = _safe(trw_val)
+                else:
+                    # ----- fallback (legacy) --------------------------------------
+                    # Compute innings pitched
+                    ip_val = row.get("innings_pitched")
+                    if ip_val in (None, ""):
+                        outs_val = row.get("outs_recorded")
+                        ip = (
+                            _safe(outs_val) / 3.0
+                            if outs_val not in (None, "")
+                            else None
+                        )
+                    else:
+                        ip = _safe(ip_val)
+
+                    team_win_pct = row.get("pct_win")
+                    if ip is not None and team_win_pct not in (None, ""):
+                        pct_pitcher_win = _safe(team_win_pct) * ip / 9.0
+                    else:
+                        pct_pitcher_win = None
+
+                row["pct_pitcher_win"] = (
+                    pct_pitcher_win if pct_pitcher_win is not None else ""
+                )
+
+                # Add to fantasy points (4 pts per win probability share)
+                fpts_before = _safe(row.get("fpts"))
+                fpts_after = fpts_before + 4.0 * _safe(pct_pitcher_win)
+                row["fpts"] = fpts_after
+
+                # Recalculate pts/$ if salary available
+                salary = _safe(row.get("dk_salary"))
+                if salary > 0:
+                    row["pts/$"] = 1000 * fpts_after / salary
+
+                # Update fpts_complete (now requires pct_pitcher_win)
+                required_fields = [
+                    "earned_runs_allowed",
+                    "outs_recorded",
+                    "strikeouts_thrown",
+                    "hits_allowed",
+                    "walks_allowed",
+                    "pct_pitcher_win",
+                ]
+                row["fpts_complete"] = all(
+                    row.get(fld) not in (None, "") for fld in required_fields
+                )
+            else:
+                # Ensure column exists for batters to retain CSV header
+                if "pct_pitcher_win" not in row:
+                    row["pct_pitcher_win"] = ""
+
+        # 5¾) Final column cleanup (rename/drop/order)
+        combined_rows = finalize_combined_rows(combined_rows)
+
+        # Now upload the combined CSV
         combined_key = build_key(proc_prefix, "combined", f"{timestamp}.csv")
-        upload_csv(_rows_to_csv(combined_rows), combined_key, bucket=bucket)
+        upload_csv(
+            _rows_to_csv(combined_rows, preferred_order=_PREFERRED_ORDER),
+            combined_key,
+            bucket=bucket,
+        )
 
         logger.info(
             "🎉 Uploaded bets → %s, players → %s, combined → %s",

@@ -115,7 +115,8 @@ def test_lambda_handler(monkeypatch):
     assert len(players_rows) == 1
     row = players_rows[0]
     assert row["player"] == "Jane"
-    assert "triples_ou" in row and "doubles" in row
+    assert "triples" in row and "doubles" in row
+    assert not any(k.endswith("_ou") for k in row)
 
     # combined CSV should match fake stub
     comb_rows = list(csv.DictReader(StringIO(combined_csv)))

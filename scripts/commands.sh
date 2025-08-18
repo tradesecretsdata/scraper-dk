@@ -14,7 +14,8 @@ pytest
 # Build and invoke
 # NOTE: must use env-vars because it, unlike .env, has priority over template.yaml
 # NOTE: optionally remove --use-container for faster (x86-64 instead of arm64) build
-sam build --use-container --debug
+#sam build --use-container --debug
+sam build --use-container
 sam local invoke ScraperFunction --env-vars env-dev.json
 
 ########################################
@@ -42,7 +43,7 @@ aws cloudformation deploy \
 sam build --use-container
 
 # Local invoke
-sam local invoke ScraperFunction -n env-dev.json
+sam local invoke ScraperFunction --env-vars env-dev.json
 
 # Stage invoke
 sam remote invoke ScraperFunction --config-env stage --stack-name pipeline-stage
